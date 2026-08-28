@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# Credenciales de la propiedad: SECRET_KEY, admin de cada instalación, URLs de
+# Railway/Vercel. Un secreto commiteado queda en el historial de git para
+# siempre, aunque se borre después. Ver docs/DESPLIEGUE_AMARENA.md.
+docs/CREDENTIALS.local.md
+
+# Alembic (keep versions, ignore cache)
+backend/alembic/__pycache__/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Data files — originals stay in data/raw
+data/processed/
+
+# Excel temp
+~$*.xlsx
+
+# Plantillas de salarios generadas a mano (nunca fueron parte del build)
+salarios_*.xlsx
+cantidades_*.xlsx
+
+# IDE
+.vscode/
+.idea/
+
+.vercel
+
+# Backups
+*.bak
+.next-check/
+
+# Salida de las verificaciones independientes (se regenera al correrlas)
+backend/scripts/_verif_salida.json

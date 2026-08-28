@@ -1,0 +1,30 @@
+{
+  "_nota": [
+    "Códigos ESTÁNDAR de categoría de habitación — los mismos para TODAS las",
+    "propiedades del grupo (owner, 2026-08-27). El código liga la categoría",
+    "entre escenarios, reportes y propiedades: el reporte de Junta cruza por",
+    "código, no por id ni por nombre. Por eso el estándar es del grupo y no de",
+    "cada hotel.",
+    "",
+    "Lo ÚNICO que edita cada propiedad es el NOMBRE (y units / pax). El código y",
+    "la posición quedan clavados al crearse: el PUT devuelve 409 si se intenta",
+    "moverlos. Ver `app/api/revenue_api.py`.",
+    "",
+    "Los nombres de acá son ROTULOS VACIOS a propósito. Sembrar los de Corcovado",
+    "dejaría las noches reales de otra propiedad guardadas bajo una categoría",
+    "que no es suya — el modo de falla que este repo ya documentó al clonar.",
+    "",
+    "Esta semilla se aplica UNA sola vez, cuando el hotel no tiene ninguna",
+    "categoría. Nunca reafirma ni renombra lo ya cargado."
+  ],
+  "room_types": [
+    {"sort_order": 1, "code": "BL01", "name": "Categoría 1", "short_name": "Categoría 1", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 2, "code": "BI02", "name": "Categoría 2", "short_name": "Categoría 2", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 3, "code": "PO03", "name": "Categoría 3", "short_name": "Categoría 3", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 4, "code": "RO04", "name": "Categoría 4", "short_name": "Categoría 4", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 5, "code": "BI05", "name": "Categoría 5", "short_name": "Categoría 5", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 6, "code": "BL06", "name": "Categoría 6", "short_name": "Categoría 6", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 7, "code": "SH07", "name": "Categoría 7", "short_name": "Categoría 7", "units": 0, "pax_min": 1, "pax_max": 2},
+    {"sort_order": 8, "code": "SH08", "name": "Categoría 8", "short_name": "Categoría 8", "units": 0, "pax_min": 1, "pax_max": 2}
+  ]
+}
