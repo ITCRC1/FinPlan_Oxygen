@@ -36,7 +36,15 @@ export default function LoginPage() {
       router.push("/scenarios");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : tc("error");
-      setError(mode === "login" && /401/.test(msg) ? t("invalidCredentials") : msg);
+      // El backend ya manda el motivo traducido en `detalle`. Se usa tal cual
+      // salvo en el 401, donde el texto de la pantalla es a propósito vago: no
+      // se le dice a nadie si el correo existe, si la cuenta está desactivada o
+      // si está bloqueada — las tres cosas contestan lo mismo.
+      const detalle = (err as { detalle?: string })?.detalle;
+      setError(
+        mode === "login" && /401/.test(msg) ? t("invalidCredentials")
+        : detalle ?? msg,
+      );
     } finally {
       setBusy(false);
     }

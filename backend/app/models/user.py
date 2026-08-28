@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, DateTime, func
+from sqlalchemy import String, Boolean, DateTime, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
@@ -30,6 +30,21 @@ class User(Base):
     tema: Mapped[str | None] = mapped_column(String(16), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # ── Freno a la fuerza bruta ───────────────────────────────────────────────
+    # `POST /auth/login` aceptaba intentos ilimitados: sin contador, sin demora y
+    # sin límite por IP. Con una lista de correos conocidos —los del grupo son
+    # predecibles— se probaba sin resistencia.
+    #
+    # El contador va en la BASE y no en memoria a propósito: en memoria se borra
+    # con cada reinicio del servicio, y Railway reinicia en cada despliegue. Un
+    # freno que se puede quitar redesplegando no es un freno.
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    #: Mientras esté en el futuro, no se acepta la contraseña ni siendo correcta.
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    last_failed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:
         return f"<User {self.email} ({self.role})>"

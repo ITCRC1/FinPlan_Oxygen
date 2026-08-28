@@ -52,10 +52,14 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-#: Lo mismo que exige `POST /auth/bootstrap` y `PATCH /auth/users/{id}`. Si acá
-#: fuera más permisivo, el script dejaría poner una clave que la app después
-#: rechaza al cambiarla desde la pantalla.
-CLAVE_MINIMA = 8
+# Lo mismo que exige `POST /auth/bootstrap` y `PATCH /auth/users/{id}`. Si acá
+# fuera más permisivo, el script dejaría poner una clave que la app después
+# rechaza al cambiarla desde la pantalla.
+#
+# ⚠️ **Se importa, no se copia.** Estuvo escrito a mano como `8` mientras la app
+# exigía otra cosa: el número más chico es el que manda, porque alcanza con
+# entrar por esa puerta. Ahora hay una sola definición (`app/auth.py`).
+from app.auth import CLAVE_MINIMA  # noqa: E402
 
 
 def _url_o_morir() -> str:
@@ -159,12 +163,19 @@ async def _cambiar(db, email: str, clave: str, activar: bool, rol: str | None) -
             + ("Los que hay: " + ", ".join(otros) if otros
                else "La tabla esta vacia: abri la app y crea el primer admin."))
 
-    antes = {"activo": u.active, "rol": u.role}
+    antes = {"activo": u.active, "rol": u.role,
+             "bloqueada": bool(getattr(u, "locked_until", None))}
     u.password_hash = hash_password(clave)
     if activar:
         u.active = True
     if rol:
         u.role = rol
+    # Cambiar la clave LIBERA el bloqueo por intentos fallidos. Es la razon mas
+    # comun por la que se corre este guion: alguien se quedo afuera. Dejarle el
+    # bloqueo puesto le daria una clave nueva que tampoco lo deja entrar, y el
+    # mensaje de la app es el generico — no habria forma de entender por que.
+    u.failed_attempts = 0
+    u.locked_until = None
     await db.commit()
 
     print(f"\n[ok] Clave cambiada para {u.email}")
@@ -172,6 +183,8 @@ async def _cambiar(db, email: str, clave: str, activar: bool, rol: str | None) -
         print(f"     activo: {antes['activo']} -> {u.active}")
     if antes["rol"] != u.role:
         print(f"     rol:    {antes['rol']} -> {u.role}")
+    if antes["bloqueada"]:
+        print("     bloqueo por intentos fallidos: liberado")
     print("\n     Entra a la app con esa clave y cambiala desde Admin -> Usuarios.")
     print("     La clave que pasaste por linea de comandos queda en el historial")
     print("     de la terminal — no la dejes como definitiva.\n")

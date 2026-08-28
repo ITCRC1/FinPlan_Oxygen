@@ -1,5 +1,6 @@
 from app.models.account import Account
 from app.models.user import User
+from app.models.auth_event import AuthEvent, EVENTOS as AUTH_EVENTOS
 from app.models.section_assignment import SectionAssignment
 from app.models.annotation import Annotation
 from app.models.payroll_catalog import PayrollAccount
@@ -78,6 +79,7 @@ from app.models.department_catalog import DepartmentCatalog
 __all__ = [
     "DepartmentCatalog",
     "Account", "PayrollAccount", "User", "SectionAssignment", "Annotation",
+    "AuthEvent", "AUTH_EVENTOS",
     "Hotel", "Scenario", "ScenarioLockedError",
     "ExchangeRate", "get_tc_for_month",
     "RoomTypeConfig", "CWL_ROOM_TYPES",

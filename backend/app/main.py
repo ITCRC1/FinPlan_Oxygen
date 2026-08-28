@@ -63,10 +63,23 @@ from app.api.cierre_periodos_api import router as cierre_router
 from app.api.guillermo_api import router as guillermo_router
 from app.hotel_actual import HOTEL_ID, HOTEL_NAME
 
+# ⚠️ **La documentación interactiva se apaga en el servidor.**
+#
+# `FastAPI()` publica `/docs`, `/redoc` y `/openapi.json` por defecto. Eso deja
+# abierto el mapa completo de la API —casi 200 endpoints con sus parámetros y
+# formas— a cualquiera que abra la URL. No es una entrada: los endpoints siguen
+# exigiendo token. Es el plano de la superficie de ataque, servido gratis.
+#
+# En local sigue encendida, que es donde sirve para trabajar.
+_EN_SERVIDOR = bool(os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("VERCEL"))
+
 app = FastAPI(
     title=f"FinPlan {HOTEL_ID}",
     description=f"Sistema de planificación financiera hotelera — {HOTEL_NAME}",
     version="0.2.0",
+    docs_url=None if _EN_SERVIDOR else "/docs",
+    redoc_url=None if _EN_SERVIDOR else "/redoc",
+    openapi_url=None if _EN_SERVIDOR else "/openapi.json",
 )
 
 # Orígenes que pueden hablarle a esta API desde el navegador.
@@ -89,14 +102,20 @@ _ORIGENES = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.st
 # autenticadas a ésta. No servía para nada acá —Amarena tiene su propia URL, que
 # entra por `CORS_ORIGINS`— y sacarlo no le quita acceso a nadie de esta
 # instalación.
+# ⚠️ **Salió el comodín `https://.*\.vercel\.app` (2026-08-28).** Dejaba que
+# CUALQUIER página alojada en Vercel —de cualquier persona— le hiciera peticiones
+# con credenciales a esta API. El comentario de arriba ya lo señalaba al explicar
+# por qué Railway sí va por lista exacta: *«el regex de Vercel ya arrastra ese
+# problema; no hay por qué repetirlo»*. Se sacó en vez de repetirlo.
+#
+# Hoy el frontend vive en Railway y entra por `CORS_ORIGINS`. **Una propiedad que
+# siga en Vercel agrega su URL exacta a esa variable** — no vuelve el comodín.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000", "http://localhost:3002",
         *_ORIGENES,
     ],
-    # Allow any Vercel deployment (production + preview URLs) for this project.
-    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

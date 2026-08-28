@@ -83,8 +83,14 @@ MENSAJES: dict[str, dict[str, str]] = {
         "es": "Hace falta indicar el escenario",
         "en": "A scenario is required"},
     "clave.muy_corta": {
-        "es": "La contraseña debe tener al menos 8 caracteres",
-        "en": "The password must be at least 8 characters long"},
+        "es": "La contraseña debe tener al menos {minimo} caracteres",
+        "en": "The password must be at least {minimo} characters long"},
+    "clave.demasiado_comun": {
+        "es": "Esa contraseña es de las primeras que alguien probaría. Elegí otra.",
+        "en": "That password is among the first anyone would try. Choose another."},
+    "clave.poca_variedad": {
+        "es": "La contraseña repite muy pocos caracteres distintos",
+        "en": "The password repeats too few distinct characters"},
 
     # ── Permisos ──────────────────────────────────────────────────────────────
     "auth.no_autenticado": {
@@ -233,6 +239,20 @@ MENSAJES: dict[str, dict[str, str]] = {
     "auth.credenciales_invalidas": {
         "es": "Credenciales inválidas",
         "en": "Invalid credentials"},
+    # ⚠️ El mensaje NO dice si el correo existe: se contesta lo mismo a una
+    # cuenta bloqueada que a un correo inventado con el que alguien insistió.
+    # Decir «esa cuenta está bloqueada» confirmaría que la cuenta existe.
+    "auth.demasiados_intentos": {
+        "es": "Demasiados intentos fallidos. Probá de nuevo en {minutos} minutos.",
+        "en": "Too many failed attempts. Try again in {minutos} minutes."},
+    "auth.demasiados_intentos_ip": {
+        "es": "Demasiados intentos desde esta conexión. Esperá un momento.",
+        "en": "Too many attempts from this connection. Wait a moment."},
+    "auth.ultimo_admin": {
+        "es": "Es el único administrador activo. Nombrá otro antes de "
+              "quitarle el rol o desactivarlo, o nadie va a poder administrar.",
+        "en": "This is the only active administrator. Appoint another one before "
+              "removing the role or deactivating, or nobody will be able to administer."},
     "auth.requiere_admin": {
         "es": "Requiere rol admin",
         "en": "Requires the admin role"},

@@ -719,6 +719,25 @@ export default function TopNav() {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
+  // ⚠️ **La barra NO se dibuja en /login.**
+  //
+  // Vivía en `app/layout.tsx` FUERA del `AuthGate` y sin ninguna condición, así
+  // que la pantalla de entrada mostraba los trece menús, el selector de idioma y
+  // el menú de Admin a quien todavía no se había identificado. Nunca fue un
+  // agujero —cada ruta redirige y cada endpoint pide token— pero ofrecía puertas
+  // que no abren, que es exactamente lo que el propio menú ya evita con
+  // `soloAdmin`. Y de paso invitaba a hacer clic antes de entrar.
+  //
+  // **Se decide por RUTA y no por «¿hay sesión?», a propósito.** `user` sale de
+  // `localStorage` dentro de un `useEffect`, así que en el render del servidor
+  // es SIEMPRE null: con esa condición la barra desaparecería un instante en
+  // cada carga de cada pantalla. La ruta vale igual en el servidor y en el
+  // navegador — no parpadea y no hay desajuste de hidratación.
+  //
+  // Va DESPUÉS de todos los hooks: React exige que se llamen siempre y en el
+  // mismo orden, así que un `return` más arriba rompería la regla.
+  if (pathname?.startsWith("/login")) return null;
+
   return (
     <nav style={{
       background: "var(--nav-bg)",

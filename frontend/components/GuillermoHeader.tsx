@@ -19,7 +19,7 @@
 // infiere ni recuerda nada: si la UI y la base discrepan, gana la base.
 //
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Guillermo from "@/components/Guillermo";
 import { getEstadoGuillermo, type EstadoGuillermo } from "@/lib/api";
 
@@ -30,10 +30,16 @@ const CADA_MS = 5 * 60 * 1000;
 
 export default function GuillermoHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const [e, setE] = useState<EstadoGuillermo | null>(null);
   const [intro, setIntro] = useState(false);
+  // En la pantalla de entrada no hay sesión: el gato ya no se dibujaba —el
+  // `catch` de abajo deja `e` en null— pero la llamada SALÍA igual, al cargar y
+  // cada cinco minutos, para cosechar un 401. Se calla en la puerta.
+  const enLogin = !!pathname?.startsWith("/login");
 
   const cargar = useCallback(async () => {
+    if (enLogin) return;
     try {
       setE(await getEstadoGuillermo());
     } catch {
@@ -42,13 +48,14 @@ export default function GuillermoHeader() {
       // ausencia del gato ya dice que no hay estado.
       setE(null);
     }
-  }, []);
+  }, [enLogin]);
 
   useEffect(() => {
+    if (enLogin) { setE(null); return; }
     cargar();
     const t = setInterval(cargar, CADA_MS);
     return () => clearInterval(t);
-  }, [cargar]);
+  }, [cargar, enLogin]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

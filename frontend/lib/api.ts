@@ -69,9 +69,19 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     // La CLAVE del error viaja aparte del texto: quien necesite DECIDIR segun
     // que error fue no puede mirar la prosa, que cambia de idioma. Ver
     // `backend/app/errores.py`.
+    // `detalle` es el mensaje YA TRADUCIDO por el backend, listo para mostrar.
+    // Viaja aparte de `message` —que sigue siendo `API <n>: <cuerpo>`— porque
+    // varias pantallas leen ese formato para decidir (`/401/.test(msg)`), y
+    // cambiarlo las rompería en silencio. Sin esto, un error nuevo se le
+    // aparecía al usuario como JSON crudo en la pantalla de login.
     let clave: string | undefined;
-    try { clave = JSON.parse(text)?.clave; } catch { /* no era JSON */ }
-    throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave });
+    let detalle: string | undefined;
+    try {
+      const cuerpo = JSON.parse(text);
+      clave = cuerpo?.clave;
+      detalle = typeof cuerpo?.detail === "string" ? cuerpo.detail : undefined;
+    } catch { /* no era JSON */ }
+    throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave, detalle });
   }
   return res.json() as Promise<T>;
 }

@@ -19,9 +19,85 @@ from app.db import get_db
 from app.errores import ErrorApi
 from app.models.user import User
 
-SECRET = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+#: Valor de conveniencia para desarrollo local. **Nunca** puede usarse en un
+#: despliegue: está escrito acá, en un repositorio, así que cualquiera que lo lea
+#: puede firmar un token con el `sub` que quiera y entrar como administrador.
+_SECRETO_DE_DESARROLLO = "dev-secret-change-me"
+
+
+def _es_despliegue() -> bool:
+    """¿Esto corre en un servidor y no en la máquina de alguien?
+
+    Mira las dos variables que ponen las plataformas por su cuenta. Es el mismo
+    criterio que usa `frontend/next.config.mjs` para reventar el build cuando
+    falta `NEXT_PUBLIC_API_URL` — y por la misma razón.
+    """
+    return bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("VERCEL"))
+
+
+def _secreto() -> str:
+    """La llave que firma las sesiones.
+
+    ⚠️ **Antes esto era `os.getenv("SECRET_KEY", "dev-secret-change-me")`.** Un
+    despliegue al que no le llegara la variable arrancaba **sin dar error**,
+    firmando con una cadena pública. No se notaba desde afuera: la app andaba
+    perfecto. Es el mismo modo de falla que ya se materializó con `HOTEL_ID`
+    —una variable que no llega, un default que la tapa— sólo que con la puerta
+    de entrada en vez de con el nombre del hotel.
+
+    Ahora un servidor sin `SECRET_KEY` **no arranca**. Cae al arrancar, con el
+    motivo escrito, en vez de quedar abierto en silencio.
+    """
+    valor = (os.environ.get("SECRET_KEY") or "").strip()
+    if valor and valor != _SECRETO_DE_DESARROLLO:
+        return valor
+    if _es_despliegue():
+        raise RuntimeError(
+            "SECRET_KEY no está configurada (o quedó con el valor de desarrollo).\n"
+            "Firma los tokens de sesión: sin ella, cualquiera que lea el "
+            "repositorio puede fabricarse un token de administrador.\n\n"
+            "Cargala en las Variables del servicio de backend de ESTA propiedad, "
+            "con un valor propio y distinto al de las demás:\n"
+            '  python -c "import secrets; print(secrets.token_urlsafe(48))"\n\n'
+            "Al cambiarla, las sesiones abiertas dejan de valer y todos vuelven "
+            "a entrar una vez. Es lo esperado.")
+    return _SECRETO_DE_DESARROLLO
+
+
+SECRET = _secreto()
 TOKEN_TTL = 60 * 60 * 24 * 7   # 7 días
 PBKDF2_ITERS = 200_000
+
+#: Longitud mínima de contraseña. Vivía copiada en tres sitios
+#: (`bootstrap`, `create_user`, `update_user`) más el guion de recuperación, con
+#: el riesgo de que uno se moviera y los otros no: el que quedara corto sería el
+#: que manda, porque alcanza con entrar por ahí.
+CLAVE_MINIMA = 10
+
+#: Lo que la gente escribe cuando le piden «diez caracteres». No pretende ser una
+#: lista de contraseñas filtradas —eso es un servicio aparte—: corta lo que un
+#: atacante prueba en los primeros veinte intentos.
+_CLAVES_OBVIAS = frozenset({
+    "contrasena", "contraseña", "password", "password1", "password123",
+    "1234567890", "12345678", "123456789", "qwertyuiop", "qwerty123",
+    "administrador", "administrator", "bienvenido", "welcome123",
+    "finplan123", "cambiame123", "changeme123", "letmein123",
+})
+
+
+def validar_clave(pw: str) -> None:
+    """Levanta `ErrorApi` si la contraseña no sirve. Silencio = está bien.
+
+    Se valida en UN solo lugar para que las cuatro puertas exijan lo mismo.
+    """
+    limpia = (pw or "").strip()
+    if len(limpia) < CLAVE_MINIMA:
+        raise ErrorApi(422, "clave.muy_corta", minimo=CLAVE_MINIMA)
+    if limpia.lower() in _CLAVES_OBVIAS:
+        raise ErrorApi(422, "clave.demasiado_comun")
+    if len(set(limpia)) < 5:
+        # 'aaaaaaaaaa' pasa la longitud y no es una contraseña.
+        raise ErrorApi(422, "clave.poca_variedad")
 
 
 # ─── Password hashing (pbkdf2_sha256) ─────────────────────────────────────────
