@@ -27,8 +27,8 @@ no cambia nada para nadie.
 
 Aditiva y reversible.
 
-Revision ID: 137
-Revises: 136
+Revision ID: 138
+Revises: 137
 """
 import sqlalchemy as sa
 from alembic import op
