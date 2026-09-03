@@ -20,7 +20,7 @@
  * `vercel --prod` sin la variable configurada tiene que quedar en la propiedad
  * de esta instalación, no en la de al lado.
  */
-export const HOTEL_ID: string = process.env.NEXT_PUBLIC_HOTEL_ID || "AMA";
+export const HOTEL_ID: string = process.env.NEXT_PUBLIC_HOTEL_ID || "OXI";
 
 /**
  * ── El NOMBRE se edita en la app, el CÓDIGO no ──────────────────────────────
