@@ -134,6 +134,107 @@ async def _catalogo_gl(session) -> dict[tuple[str, str], str]:
 def _f(x) -> float:
     return float(x or 0)
 
+#: Los doce meses, en el orden de las columnas de los checkbooks.
+_MESES_COL = ["jan", "feb", "mar", "apr", "may", "jun",
+              "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
+class _AsientoDeCheckbook:
+    """Un asiento SINTETICO, armado desde los checkbooks.
+
+    Imita lo justo de `ActualEntry` para que el resto de la auditoria no
+    tenga que saber de donde salio: codigo, departamento, nombre y las doce
+    columnas de mes.
+
+    ⚠️ **No es un asiento del mayor y no se guarda en ninguna tabla.** Vive
+    lo que dura la respuesta. Un presupuesto no tiene GL importado; lo que
+    tiene es la cuenta contable con la que se digito cada linea del
+    checkbook, y eso es lo que se muestra — sin decir que viene del mayor.
+    """
+
+    __slots__ = ("account_code", "dept_code", "account_name", "outlet",
+                 "_serie", "linea_propia", "tipo_propio")
+
+    def __init__(self, dept, cuenta, nombre, serie,
+                 linea_propia=None, tipo_propio=""):
+        self.account_code = cuenta
+        self.dept_code = dept
+        self.account_name = nombre
+        self.outlet = ""
+        self._serie = serie
+        #: ⚠️ El INGRESO de un presupuesto se planea POR LÍNEA, no por cuenta:
+        #: el checkbook guarda `REV_ROOMS`, no una 4xxx. `linea_de_fila` mira
+        #: el primer dígito del código y una línea no tiene dígito, así que
+        #: devolvía «sin tipo» y los ingresos se contaban como estadística —
+        #: 29.472 de junio de 2027 quedaban fuera del cuadre. Cuando la fila ya
+        #: sabe a qué renglón va, se respeta.
+        self.linea_propia = linea_propia
+        self.tipo_propio = tipo_propio
+
+    def __getattr__(self, nombre):
+        try:
+            return self._serie[_MESES_COL.index(nombre)]
+        except ValueError:
+            raise AttributeError(nombre) from None
+
+
+async def _asientos_del_checkbook(session, escenario) -> list:
+    """El detalle por cuenta de una version SIN mayor: sale de los checkbooks.
+
+    Owner, 2026-09-03: *«el presupuesto debe tener gl, siempre debe estar
+    conectado a un gl»*. Y lo esta: las filas de opex y de costo se digitan
+    con su `account_code` —en el BUDGET 2027 de Oxygen, cero nulos sobre 140
+    filas—, y la planilla guarda los 17 conceptos, que son cuentas del mayor.
+    Lo que faltaba no era el dato: era leerlo.
+
+    ⚠️ **Reusa `_del_auxiliar`, no una copia.** Esa funcion ya resuelve las
+    cuatro trampas de leer un checkbook —la cadena de departamentos padre, el
+    reparto de lavanderia y cafeteria por mes, los conceptos de planilla como
+    cuentas, y el ingreso por cuenta—. Reescribirlas aca daria dos lecturas
+    del mismo checkbook que un dia dirian cosas distintas.
+    """
+    # Adentro de la funcion: `detalle_celda_api` importa de `pl_api`, igual
+    # que este modulo, y a nivel de modulo se cerraria el circulo.
+    from app.api.detalle_celda_api import _del_auxiliar
+
+    fuera = []
+    for clase in ("revenue", "cost", "payroll", "opex", "property"):
+        r = await _del_auxiliar(session, escenario, clase, "")
+        nombres = r.get("nombres") or {}
+        for (dept, cuenta), serie in (r.get("series") or {}).items():
+            if not cuenta:
+                continue
+            # ⚠️ El ingreso llega con el GRUPO pelado como llave —`ROOMS`,
+            # `ACTIVITIES`—, no con una cuenta ni con la línea. La traducción
+            # sale de `REVENUE_LINE_TO_REPORT_LINE`, que es **la tabla del
+            # motor** y existe justo para esto: versiones cuyo ingreso viene a
+            # nivel de línea, sin detalle 4xxx.
+            #
+            # Pegar `"REV_" + grupo` parecía equivalente y no lo es: el grupo
+            # `ACTIVITIES` alimenta la línea `REV_TOURS`, así que la
+            # concatenación producía `REV_ACTIVITIES` —un renglón que el
+            # reporte no dibuja— y los 10.800 del año quedaban huérfanos. Una
+            # tabla propia acá tendría el mismo destino la próxima vez.
+            # ⚠️ Y sólo cuando la llave NO es una cuenta. El ingreso del
+            # Club de Amarena llega con 4500/4501/4502 —cuentas del mayor de
+            # verdad—, y traducirlas como si fueran un grupo producía
+            # `REV_4500`: 17.200 huérfanos por mes. Numérica es cuenta, y la
+            # resuelve `linea_de_fila` como cualquier otra.
+            if clase == "revenue" and not cuenta.strip().isdigit():
+                linea = pl_engine._canon(
+                    pl_engine.REVENUE_LINE_TO_REPORT_LINE.get(cuenta.lower())
+                    or "REV_%s" % cuenta)
+                fuera.append(_AsientoDeCheckbook(
+                    "", cuenta, nombres.get(linea, "") or nombres.get(cuenta, ""),
+                    serie, linea_propia=linea,
+                    tipo_propio=pl_engine.TIPO_INGRESO))
+                continue
+            fuera.append(_AsientoDeCheckbook(
+                dept or "", cuenta, nombres.get(cuenta, ""), serie))
+    return fuera
+
+
+
 
 @router.get("/pl/{scenario_id}/auditoria/")
 async def auditoria_del_mes(scenario_id: str, mes: int):
@@ -160,6 +261,13 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         # filas en silencio no puede demostrar que no descartó nada.
         todos = list((await session.execute(select(ActualEntry).where(
             ActualEntry.scenario_id == scenario_id))).scalars())
+
+        # Sin mayor, se auditan los checkbooks. Un BUDGET no tiene asientos
+        # importados, pero SI tiene la cuenta contable de cada linea digitada
+        # — ver `_asientos_del_checkbook`.
+        del_checkbook = not todos
+        if del_checkbook:
+            todos = await _asientos_del_checkbook(session, escenario)
 
         detalle = []
         por_linea: dict[str, Decimal] = {}
@@ -190,7 +298,10 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
 
         for e in todos:
             monto = Decimal(str(getattr(e, col, None) or 0))
-            linea, tipo = pl_engine.linea_de_fila(e.account_code, e.dept_code)
+            linea = getattr(e, "linea_propia", None)
+            tipo = getattr(e, "tipo_propio", "")
+            if not linea:
+                linea, tipo = pl_engine.linea_de_fila(e.account_code, e.dept_code)
             if not tipo:
                 # 9xxx: estadística, no es plata. Se CUENTA en vez de
                 # desaparecer, para que el total del mes se pueda comprobar.
@@ -452,9 +563,19 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         avisos = []
         if not n_con_monto:
             avisos.append(
-                "Este escenario no tiene detalle por cuenta cargado para el mes. "
-                "La auditoría sólo aplica a los actuales importados: un "
-                "presupuesto armado en los checkbooks no tiene GL que auditar.")
+                "Este escenario no tiene detalle por cuenta cargado para el "
+                "mes: ni asientos del mayor, ni líneas digitadas en los "
+                "checkbooks con su cuenta contable.")
+        elif del_checkbook:
+            # ⚠️ Se DICE de dónde salió. El detalle de un presupuesto no es un
+            # asiento del mayor —nadie lo contabilizó— sino la cuenta con la
+            # que se planeó cada línea. Mostrarlo sin aclararlo lo haría pasar
+            # por contabilidad, que es exactamente lo que este libro no puede
+            # hacer.
+            avisos.append(
+                "El detalle sale de los checkbooks, no del mayor: es la cuenta "
+                "contable con la que se planeó cada línea. Esta versión no "
+                "tiene actuales importados.")
         # ⚠️ Sólo las que TIENEN movimiento. Una opción del catálogo en cero
         # que no cae en ninguna línea no es plata perdida: es una opción que no
         # se usó. Contarla acá inventaría un problema.
