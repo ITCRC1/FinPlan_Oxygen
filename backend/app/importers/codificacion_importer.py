@@ -21,11 +21,28 @@ from app.models.payroll_position import PayrollPosition
 
 
 def _pad4(val) -> str:
-    """Convert numeric nivel2 to zero-padded 4-char dept_code string."""
+    """El `nivel2` del archivo → código de departamento del catálogo.
+
+    ⚠️ **Antes hacía `zfill(4)` sin condición**, y eso rompía el Club Madresal:
+    su código es `260`, de tres dígitos, y entraba como `0260` — un
+    departamento que no existe. El Área Recreativa (270) y Misceláneos (280)
+    caían igual.
+
+    No fallaba: el código inexistente hace que el motor mande su gasto a
+    `OTHER_OVERHEAD`, el P&L cuadra y nadie se entera. Y el Club es el
+    departamento más grande del hotel — 58 puestos, 689 conceptos de planilla.
+
+    Ahora se delega en `app/departamentos.normalizar_dept_code`, que sabe
+    —preguntándole al catálogo— cuáles son de tres de verdad.
+    """
+    from app.departamentos import normalizar_dept_code
     try:
-        return str(int(val)).zfill(4)
+        crudo = str(int(val))
     except (ValueError, TypeError):
-        return str(val).strip().zfill(4)
+        crudo = str(val).strip()
+    # El relleno a cuatro sigue siendo el caso normal: `110` -> `0110`. Lo que
+    # cambia es que ya no se le aplica a los que son de tres de verdad.
+    return normalizar_dept_code(crudo if len(crudo) >= 3 else crudo.zfill(4))
 
 
 def import_codificacion(

@@ -5,9 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.auth import get_current_user
 from app.candado import candado_del_escenario
+from app.perfiles import solo_lectura
 # ⚠️ El import ENGANCHA el listener del ORM: un mes cerrado no se edita.
 # Ver `app/candado_meses.py`.
 import app.candado_meses  # noqa: F401
+# Le devuelve el cero de adelante a los codigos de departamento que entran sin
+# el (`110` -> `0110`). Ver `app/departamentos.py`: hay cuatro caminos de
+# escritura y el ORM los ve a todos.
+import app.departamentos  # noqa: F401
 from app.errores import ErrorApi, manejador as _manejador_errores
 from app.models.scenario import ScenarioLockedError
 from app.api.accounts_api import router as accounts_router
@@ -25,6 +30,9 @@ from app.api.big_picture_api import router as big_picture_router
 from app.api.actuals_api import router as actuals_router
 from app.api.mapping_api import router as mapping_router
 from app.api.audit_api import router as audit_router
+from app.api.auditoria_api import router as auditoria_router
+from app.api.detalle_celda_api import router as detalle_celda_router
+from app.api.comentario_pl_api import router as comentario_pl_router
 from app.api.auth_api import router as auth_router
 from app.api.collab_api import router as collab_router
 from app.api.cashflow_directo_api import router as cashflow_directo_router
@@ -140,7 +148,15 @@ async def _escenario_bloqueado(request: Request, exc: ScenarioLockedError):
 # el 2026-08-20, de 194 endpoints que escriben sólo catorce lo verificaban.
 # Enganchado en el router, una ruta nueva queda cubierta sin que nadie se
 # acuerde — ver `app/candado.py`.
-_guard = [Depends(get_current_user), Depends(candado_del_escenario)]
+# `solo_lectura` va en la MISMA lista y por la misma razon que el candado: es
+# el perfil `viewer` del owner, y engancharlo aca cubre los 197 endpoints que
+# escriben de una vez. Ver `app/perfiles.py`.
+#
+# El orden importa poco pero no es casual: primero quien sos, despues si tu
+# perfil escribe, y de ultimo si ESE escenario esta enllavado. Asi un lector
+# recibe 403 («vos no podes») y no 409 («esta cerrado»), que diria otra cosa.
+_guard = [Depends(get_current_user), Depends(solo_lectura),
+          Depends(candado_del_escenario)]
 app.include_router(accounts_router, prefix="/api", dependencies=_guard)
 app.include_router(scenarios_router, prefix="/api", dependencies=_guard)
 app.include_router(exchange_rates_router, prefix="/api", dependencies=_guard)
@@ -156,6 +172,9 @@ app.include_router(big_picture_router, prefix="/api", dependencies=_guard)
 app.include_router(actuals_router, prefix="/api", dependencies=_guard)
 app.include_router(mapping_router, prefix="/api", dependencies=_guard)
 app.include_router(audit_router, prefix="/api", dependencies=_guard)
+app.include_router(auditoria_router, prefix="/api", dependencies=_guard)
+app.include_router(detalle_celda_router, prefix="/api", dependencies=_guard)
+app.include_router(comentario_pl_router, prefix="/api", dependencies=_guard)
 app.include_router(collab_router, prefix="/api", dependencies=_guard)
 app.include_router(cashflow_directo_router, prefix="/api", dependencies=_guard)
 app.include_router(rooms_sets_router, prefix="/api", dependencies=_guard)

@@ -140,7 +140,15 @@ def test_es_UNA_dependencia_en_el_router_y_no_108_ediciones():
     main = pathlib.Path(candado.__file__).parent / "main.py"
     texto = main.read_text(encoding="utf-8")
     assert "Depends(candado_del_escenario)" in texto
-    assert "_guard = [Depends(get_current_user), Depends(candado_del_escenario)]" in texto
+    # Se mira la ASIGNACIÓN de `_guard`, no la línea literal. Fijar el texto
+    # exacto hacía que agregar una guarda nueva —el perfil de sólo lectura, en
+    # 2026-08-26— rompiera esta prueba sin que el candado se hubiera movido: un
+    # falso positivo que enseña a editar la prueba en vez de leerla.
+    asignacion = texto.split("_guard = [", 1)[1].split("]", 1)[0]
+    assert "Depends(candado_del_escenario)" in asignacion, (
+        "el candado salió de `_guard`: enllavar volvería a frenar los imports "
+        "pero no a impedir editar planilla, opex, revenue ni costos")
+    assert "Depends(get_current_user)" in asignacion
 
 
 def test_cubre_TODAS_las_rutas_de_escritura_con_escenario():

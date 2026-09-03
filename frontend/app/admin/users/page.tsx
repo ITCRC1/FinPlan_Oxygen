@@ -89,6 +89,29 @@ export default function UsersPage() {
     } catch (e: unknown) { setError(e instanceof Error ? e.message : tc("error")); }
   }
 
+  /**
+   * Cómo se llama cada rol en pantalla, EN UN SOLO LUGAR.
+   *
+   * Antes había dos `<option>` escritas a mano en dos sitios y una tabla que
+   * rotulaba «editor» a todo lo que no fuera admin. Agregar el perfil de sólo
+   * lectura (owner, 2026-08-26) con esa forma habría hecho que un `viewer`
+   * apareciera en la lista como editor — el error más caro posible acá, porque
+   * se ve exactamente igual a que el permiso no se hubiera aplicado.
+   *
+   * `guillermo_approver` no se ofrece en los desplegables —se asigna aparte,
+   * ver `docs/GUILLERMO.md` §7— pero sí tiene rótulo: si alguien lo tiene, la
+   * lista tiene que poder decirlo.
+   */
+  const ROTULO_ROL: Record<string, string> = {
+    admin: "Admin",
+    collaborator: t("collaborator"),
+    viewer: "Sólo lectura",
+    guillermo_approver: "Aprobador",
+  };
+  /** Los que se pueden elegir desde acá. */
+  const ASIGNABLES = ["collaborator", "viewer", "admin"];
+  const rotuloRol = (r: string) => ROTULO_ROL[r] || r;
+
   const rolePill = (r: string): React.CSSProperties => ({
     fontSize: 11, padding: "2px 8px", borderRadius: 5,
     color: r === "admin" ? "var(--brand)" : "var(--text-secondary)",
@@ -132,8 +155,9 @@ export default function UsersPage() {
           <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
             {t("role")}
             <select style={input} value={role} onChange={e => setRole(e.target.value)}>
-              <option value="collaborator">{t("collaborator")}</option>
-              <option value="admin">Admin</option>
+              {ASIGNABLES.map(r => (
+                <option key={r} value={r}>{rotuloRol(r)}</option>
+              ))}
             </select>
           </label>
           <button onClick={handleCreate} disabled={busy || !email.includes("@")} style={btn(!busy && email.includes("@"))}>
@@ -191,15 +215,21 @@ export default function UsersPage() {
               <tr key={u.id}>
                 <td style={{ textAlign: "left", fontWeight: 500 }}>{u.name || "—"}{self && <span style={{ color: "var(--text-disabled)", fontSize: 11 }}>{t("you")}</span>}</td>
                 <td style={{ textAlign: "left" }}>{u.email}</td>
-                <td style={{ textAlign: "left" }}><span style={rolePill(u.role)}>{u.role === "admin" ? "Admin" : t("collaborator")}</span></td>
+                <td style={{ textAlign: "left" }}><span style={rolePill(u.role)}>{rotuloRol(u.role)}</span></td>
                 <td style={{ textAlign: "left", color: u.active ? "var(--accent-green, #1A7F4B)" : "var(--text-disabled)", fontSize: 12 }}>{u.active ? t("active") : t("inactive")}</td>
                 {me?.role === "admin" && (
                   <td style={{ textAlign: "left" }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       <select className="fin-input" value={u.role} disabled={self}
                         onChange={e => patch(u.id, { role: e.target.value })} style={{ fontSize: 11, padding: "2px 4px" }}>
-                        <option value="collaborator">{t("collaborator")}</option>
-                        <option value="admin">Admin</option>
+                        {/* Si el usuario ya tiene un rol que no se asigna desde
+                            acá (`guillermo_approver`), se incluye igual: sin
+                            eso el `<select>` mostraría otro valor y el primer
+                            cambio de «activo» se lo pisaría en silencio. */}
+                        {(ASIGNABLES.includes(u.role)
+                          ? ASIGNABLES : [...ASIGNABLES, u.role]).map(r => (
+                          <option key={r} value={r}>{rotuloRol(r)}</option>
+                        ))}
                       </select>
                       <button onClick={() => patch(u.id, { active: !u.active })} disabled={self}
                         style={{ ...editBtn, opacity: self ? 0.4 : 1 }}>{u.active ? t("deactivate") : t("activate")}</button>

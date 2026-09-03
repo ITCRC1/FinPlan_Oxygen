@@ -27,7 +27,8 @@ import IrA from "@/components/IrA";
 import { NAV } from "@/components/TopNav";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
-  getTabsApagados, saveTabsApagados, NADA_APAGADO, type TabsApagados,
+  getTabsApagados, saveTabsApagados, NADA_APAGADO, PERFILES, ROTULO_PERFIL,
+  type Perfil, type TabsApagados,
 } from "@/lib/tabsVisibles";
 
 /** Esta misma pantalla. Apagarla se puede —el owner lo pidió— pero se avisa. */
@@ -36,6 +37,12 @@ const YO = "tabsProvisioning";
 export default function TabsProvisioningPage() {
   const t = useTranslations("nav");
   const [apagados, setApagados] = useState<TabsApagados>(NADA_APAGADO);
+  /** Para QUIÉN se está configurando. `""` = para toda la propiedad.
+   *
+   *  Owner, 2026-08-26: *«vistas limitadas por perfil»*. Arranca en la matriz
+   *  de la propiedad porque es la decisión que manda: lo que se apaga ahí no lo
+   *  ve nadie, y afinar por perfil sólo tiene sentido después. */
+  const [perfil, setPerfil] = useState<Perfil>("");
   const [tab, setTab] = useState<string>(NAV[0]?.key || "");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -46,13 +53,16 @@ export default function TabsProvisioningPage() {
     setCargando(true);
     setError(null);
     try {
-      setApagados(await getTabsApagados(HOTEL_ID));
+      // ⚠️ `perfil` va SIEMPRE, incluso vacío: sin él, el backend contestaría
+      // por el rol de quien abrió la pantalla y estaríamos editando la vista
+      // del admin creyendo que editamos la de la propiedad.
+      setApagados(await getTabsApagados(HOTEL_ID, perfil));
     } catch (err) {
       setError(err instanceof Error ? err.message : "no se pudo cargar");
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [perfil]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -77,13 +87,14 @@ export default function TabsProvisioningPage() {
     setGuardando(true);
     setError(null); setAviso(null);
     try {
-      const r = await saveTabsApagados(HOTEL_ID, rows);
+      const r = await saveTabsApagados(HOTEL_ID, rows, perfil);
       setApagados(r.estado);
       const n = r.apagados + r.prendidos;
+      const para = perfil ? `el perfil ${ROTULO_PERFIL[perfil]}` : HOTEL_ID;
       // La barra se entera sola (`alCambiarTabs`): mandar a recargar se lee
       // como «no guardó».
       setAviso(n
-        ? `Guardado para ${HOTEL_ID}: ${r.apagados} escondido(s), ${r.prendidos} habilitado(s)`
+        ? `Guardado para ${para}: ${r.apagados} escondido(s), ${r.prendidos} habilitado(s)`
         : "Sin cambios");
       if (rows.some(x => x.clave === YO && !x.visible)) {
         setAviso("Escondiste esta misma pantalla. Se sigue entrando por su URL: /admin/tabs");
@@ -131,10 +142,55 @@ export default function TabsProvisioningPage() {
       }}>
         <b>Esconde de la barra; no es un permiso.</b> La ruta sigue
         respondiendo: quien escriba la URL entra igual, y el reporte devuelve lo
-        mismo. Si hace falta impedir el acceso, eso son roles — no esta
-        pantalla. Por eso se puede apagar todo sin quedarse afuera: hasta ésta
-        se recupera entrando a <span className="mono">/admin/tabs</span>.
+        mismo. Para <i>impedir</i> el cambio está el perfil{" "}
+        <b>Sólo lectura</b>, que se asigna en Usuarios y hace que el servidor
+        rechace toda escritura. Las dos cosas se complementan: ésta ordena la
+        vista, aquélla impide el cambio. Por eso se puede apagar todo sin
+        quedarse afuera: hasta esta pantalla se recupera entrando a{" "}
+        <span className="mono">/admin/tabs</span>.
       </div>
+
+      {/* ── Para quién ────────────────────────────────────────────────────
+          Owner, 2026-08-26: «vistas limitadas por perfil». Va ARRIBA del
+          selector de tab porque cambia el significado de todo lo de abajo: la
+          misma casilla apagada quiere decir cosas distintas según a quién se
+          le esté apagando. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8,
+                    flexWrap: "wrap", marginBottom: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 700,
+                       color: "var(--text-secondary)" }}>
+          Configurando para:
+        </span>
+        {PERFILES.map(pf => (
+          <button key={pf || "todos"} onClick={() => setPerfil(pf)}
+            disabled={guardando}
+            style={{
+              padding: "5px 12px", fontSize: 12,
+              fontWeight: perfil === pf ? 700 : 500,
+              border: "1px solid var(--border-medium)", borderRadius: 5,
+              cursor: perfil === pf ? "default" : "pointer",
+              background: perfil === pf ? "var(--brand)" : "var(--bg-surface)",
+              color: perfil === pf ? "#fff" : "var(--text-primary)",
+            }}>
+            {ROTULO_PERFIL[pf]}
+          </button>
+        ))}
+      </div>
+
+      {perfil && (
+        <div style={{
+          padding: "10px 14px", borderRadius: 9, maxWidth: 860, marginBottom: 16,
+          border: "1px solid var(--border)",
+          borderLeft: "4px solid var(--brand)",
+          fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.6,
+        }}>
+          Estás viendo <b>sólo lo que se apagó para {ROTULO_PERFIL[perfil]}</b>.
+          Lo que apagaste en <b>Toda la propiedad</b> también le aplica y no
+          aparece marcado acá — se suman, no se reemplazan. Por eso prender algo
+          en esta lista no lo devuelve si la propiedad lo tiene apagado:{" "}
+          <b>la propiedad manda sobre el perfil</b>.
+        </div>
+      )}
 
       {error && <p style={{ color: "var(--negative)", fontSize: 13 }}>{error}</p>}
       {aviso && <p style={{ color: "var(--positive)", fontSize: 13 }}>{aviso}</p>}

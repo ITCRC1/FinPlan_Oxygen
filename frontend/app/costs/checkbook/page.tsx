@@ -1,4 +1,6 @@
 "use client";
+import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
+  from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
@@ -60,9 +62,11 @@ function fmtPct(v: string) {
 
 // Inline editable number cell
 function NumCell({
-  value, onSave, disabled = false,
+  value, onSave, disabled = false, cerrado = false,
 }: {
   value: string; onSave: (v: number) => void; disabled?: boolean;
+  /** El mes ya tiene actuales: se muestra, no se edita. */
+  cerrado?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(money2(value));
@@ -72,6 +76,16 @@ function NumCell({
     if (!isNaN(n)) onSave(n);
     setEditing(false);
   }
+
+  // ⚠️ Distinto de `disabled`: aquel es «este renglon lo calcula un driver»;
+  // esto es «este MES ya cerro». Se ven parecido y no son lo mismo — por eso el
+  // titulo, que dice cual de las dos es.
+  if (cerrado) return (
+    <td className="mono" title={TITULO_CERRADO}
+        style={{ textAlign: "right", padding: "2px 6px", ...CELDA_CERRADA }}>
+      {fmtUsd(value)}
+    </td>
+  );
 
   if (disabled) return (
     <td className="mono" style={{ textAlign: "right", color: "var(--text-disabled)" }}>
@@ -108,6 +122,7 @@ export default function CostsCheckbookPage() {
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const t = useTranslations("costs");
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
+  const { cerrado, cerrados } = useMesesCerrados(scenarioId);
   const [scenarios, setScenarios]         = useState<Scenario[]>([]);
   const [depts, setDepts]                 = useState<CwlDept[]>([]);
   const [selectedDept, setSelected]       = useState<string | null>(null);
@@ -421,6 +436,19 @@ export default function CostsCheckbookPage() {
 
       {!loading && !error && !deptLoading && checkbook && (
         <div className="fin-sticky" style={{ overflowX: "auto" }}>
+          {cerrados.length > 0 && (
+            <div style={{
+              padding: "8px 12px", marginBottom: 10, borderRadius: 7,
+              border: "1px solid var(--border)",
+              borderLeft: "4px solid var(--brand)",
+              fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)",
+            }}>
+              🔒 <b>Meses cerrados: {cerrados.map(m => MONTHS[m - 1]).join(", ")}.</b>{" "}
+              Ya tienen actuales cargados, así que se muestran en gris y no se
+              editan. El forecast se trabaja de{" "}
+              <b>{MONTHS[Math.max(...cerrados)] ?? ""}</b> en adelante.
+            </div>
+          )}
           <table className="fin-table" style={{ minWidth: 1400, fontSize: 12 }}>
             <thead>
               <tr>
@@ -430,8 +458,12 @@ export default function CostsCheckbookPage() {
                 <th style={{ textAlign: "center", width: 100 }}>Driver</th>
                 <th style={{ textAlign: "center", width: 80 }}>{t("colRate")}</th>
                 <th style={{ textAlign: "left", width: 120 }}>{t("colRevRef")}</th>
-                {MONTHS.map(m => (
-                  <th key={m} style={{ textAlign: "right", minWidth: 80 }}>{m}</th>
+                {MONTHS.map((m, mi) => (
+                  <th key={m} title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                      style={{ textAlign: "right", minWidth: 80,
+                               ...(cerrado(mi + 1) ? CABECERA_CERRADA : {}) }}>
+                    {m}
+                  </th>
                 ))}
                 <th style={{ textAlign: "right", color: "var(--brand)" }}>{tc("annual")}</th>
               </tr>
@@ -596,6 +628,7 @@ export default function CostsCheckbookPage() {
                         isDriver && entry.driver_type === "REVENUE_LINE" ? (
                           <MonthPctCell
                             key={mk}
+                            cerrado={cerrado(MONTH_KEYS.indexOf(mk) + 1)}
                             pct={entry.rates?.[mk] != null
                               ? parseFloat(entry.rates![mk] as string)
                               : parseFloat(entry.driver_pct_or_rate || "0")}
@@ -607,6 +640,7 @@ export default function CostsCheckbookPage() {
                             key={mk}
                             value={entry.months[mk] ?? "0"}
                             disabled={isDriver}
+                            cerrado={cerrado(MONTH_KEYS.indexOf(mk) + 1)}
                             onSave={v => saveEntryMonth(entry, mk, v)}
                           />
                         )
@@ -818,12 +852,20 @@ function RateCell({
 
 // ── Celda de mes: % editable arriba, monto calculado abajo ──────────────────────
 function MonthPctCell({
-  pct, amount, onSave,
+  pct, amount, onSave, cerrado = false,
 }: {
   pct: number; amount: string; onSave: (pctValue: number) => void;
+  cerrado?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState((pct * 100).toFixed(1));
+
+  if (cerrado) return (
+    <td className="mono" title={TITULO_CERRADO}
+        style={{ textAlign: "right", padding: "2px 6px", ...CELDA_CERRADA }}>
+      {fmtUsd(amount)}
+    </td>
+  );
   function commit() {
     const n = parseFloat(draft);
     if (!isNaN(n)) onSave(n);

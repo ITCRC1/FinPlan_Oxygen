@@ -69,12 +69,34 @@ async def dept_apagado(
 # reglas: tabla esparsa, default prendido.
 
 
-async def tabs_apagados(db: AsyncSession, hotel_id: str) -> dict[str, list[str]]:
-    """`{"TAB": [...], "ITEM": [...]}` — sólo lo que alguien apagó a mano."""
+async def tabs_apagados(db: AsyncSession, hotel_id: str,
+                        perfil: str | None = None) -> dict[str, list[str]]:
+    """`{"TAB": [...], "ITEM": [...]}` — sólo lo que alguien apagó a mano.
+
+    `perfil` decide QUÉ conjunto se devuelve, y son dos preguntas distintas:
+
+    * **`None`** — «qué está apagado para todos», que es la matriz de la
+      propiedad. Es lo que edita la pantalla de provisionamiento cuando no se
+      eligió ningún perfil, y lo que ve un rol sin filas propias.
+    * **un perfil** — lo de la propiedad **más** lo de ese perfil. Es la unión,
+      no el reemplazo: la propiedad manda sobre el perfil. Si una propiedad no
+      hace Break-Even no lo hace para nadie, y dejar que un perfil lo prendiera
+      sería contradecir esa decisión desde un lugar más chico.
+
+    `""` como perfil equivale a `None` — es el mismo centinela que guarda la
+    tabla, y tratarlo distinto haría que un rol vacío devolviera la unión con
+    una fila que no existe.
+    """
     from app.models.tab_enablement import TabEnablement
 
-    fuera: dict[str, list[str]] = {"TAB": [], "ITEM": []}
+    from app.models.tab_enablement import SCOPE_KINDS
+
+    quienes = {""} | ({perfil} if perfil else set())
+    # Todos los niveles arrancan presentes y vacíos: una pantalla que pregunta
+    # por `SUBTAB` no tiene que saber si alguien apagó alguno todavía.
+    fuera: dict[str, set[str]] = {k: set() for k in SCOPE_KINDS}
     for r in (await db.execute(select(TabEnablement).where(
-            TabEnablement.hotel_id == hotel_id))).scalars().all():
-        fuera.setdefault(r.scope_kind, []).append(r.clave)
+            TabEnablement.hotel_id == hotel_id,
+            TabEnablement.perfil.in_(quienes)))).scalars().all():
+        fuera.setdefault(r.scope_kind, set()).add(r.clave)
     return {k: sorted(v) for k, v in fuera.items()}

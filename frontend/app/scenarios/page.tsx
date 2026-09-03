@@ -13,8 +13,13 @@ import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 
 const HOTEL = HOTEL_ID;
-// Working y Final son versiones protegidas: no se pueden borrar (regla de negocio).
-const isProtected = (s: Scenario) => /working|final/i.test(s.version);
+/** ¿Este escenario NO se puede borrar? Lo dice el backend en el propio
+ *  escenario (`protected`), que es el que después rechaza el DELETE.
+ *
+ *  ⚠️ Antes se deducía acá con `/working|final/i` —y en otras dos partes con
+ *  su propia copia—. Con eso, un `Working-VIEJO` no mostraba el botón de
+ *  borrar y no había forma de sacarlo de la lista. */
+const isProtected = (s: Scenario) => s.protected === true;
 const TYPES = ["BUDGET", "FORECAST", "ACTUAL"] as const;
 
 function label(s: Scenario): string {

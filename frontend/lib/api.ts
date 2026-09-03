@@ -83,6 +83,19 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     } catch { /* no era JSON */ }
     throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave, detalle });
   }
+  // ⚠️ **Una respuesta SIN cuerpo no es JSON.**
+  //
+  // Owner, 2026-09-03, borrando un escenario: «json fallo, no se borro». Se
+  // habia borrado — el servidor contesta `204 No Content`, que por definicion
+  // no trae cuerpo, y `res.json()` sobre un cuerpo vacio tira «Unexpected end
+  // of JSON input». El borrado ya habia ocurrido y el error salia despues, al
+  // leer la respuesta: la pantalla mostraba un fallo de algo que funciono.
+  //
+  // Se mira el 204 y el `content-length: 0` porque no todos los servidores
+  // mandan los dos, y basta uno para saber que no hay que parsear.
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }
 
@@ -285,6 +298,12 @@ export interface Scenario {
   revenue_source?: string; // "drivers" | "checkbook"
   created_by?: string;
   created_at?: string;
+  /** ¿Es un entregable que no se borra? Lo decide el BACKEND —la misma función
+   *  que rechaza el DELETE—, así que la pantalla sólo lo obedece.
+   *
+   *  ⚠️ No deducirlo del nombre. Estuvo escrito tres veces, cada una con su
+   *  regex de subcadena, y por eso un `Working-VIEJO` quedaba imborrable. */
+  protected?: boolean;
 }
 
 // ── Scenario data operations (planning) ───────────────────────────────────────
@@ -2223,13 +2242,46 @@ export interface AllocationSummary {
 export interface CalculateResult {
   ok: boolean;
   total_entries: number;
-  monthly: {
+  /** Avisos del recálculo — meses cerrados que no se tocaron, y demás. */
+  avisos?: string[];
+  /**
+   * El desglose mes a mes.
+   *
+   * ⚠️ **OPCIONAL, y no es un descuido.** `POST /allocations/{id}/calculate/`
+   * dejó de mandarlo cuando pasó a delegar en `_recalc_allocations` —el mismo
+   * paso del recálculo completo—, y la pantalla lo seguía leyendo: de ahí salía
+   * el «Cannot read properties of undefined (reading 'laundry')» que dejaba la
+   * pantalla en blanco al apretar Recalcular.
+   *
+   * Se marca opcional para que el compilador OBLIGUE a preguntar antes de
+   * usarlo. Lo que el reparto realmente hizo se lee en `/summary/` y
+   * `/laundry-breakdown/`, que la pantalla vuelve a pedir enseguida.
+   */
+  monthly?: {
     cafeteria: { month: number; total_cost: number; rows: number; nets_zero: boolean }[];
     laundry: {
       month: number; total_cost: number; rows: number; nets_zero: boolean;
       linen_cost?: number; uniform_cost?: number; guest_cost?: number;
     }[];
   };
+}
+
+/**
+ * Saca un departamento de la matriz de reparto.
+ *
+ * ⚠️ `dept` va como parámetro, no en la ruta: la fila que más hay que poder
+ * borrar es la que tiene el departamento VACÍO —un renglón en blanco guardado
+ * sin llenar—, y `.../config//` no es una URL válida.
+ *
+ * No recalcula: saca la fila y deja los asientos. Rehacer el reparto es una
+ * decisión aparte.
+ */
+export async function borrarFilaReparto(
+  tipo: "laundry" | "cafeteria", scenarioId: string, dept: string,
+): Promise<{ ok: boolean; borradas: number }> {
+  return api.delete<{ ok: boolean; borradas: number }>(
+    `/allocations/${tipo}/${encodeURIComponent(scenarioId)}/config/`
+    + `?dept=${encodeURIComponent(dept)}`);
 }
 
 export async function getCafeteriaConfig(scenarioId: string): Promise<CafeteriaConfigRow[]> {
@@ -2556,6 +2608,159 @@ export interface PLLine {
   por?: number;   // Per Occupied Room (USALI)
 }
 
+// ── Los doce meses de una version, sin agregar (owner, 2026-08-28) ───────────
+export interface PLDoceMeses {
+  scenario_id: string;
+  escenario: string;
+  year: number;
+  meses: { month: number; kpis: PLKpis; lines: PLLine[] }[];
+}
+export async function getPLDoceMeses(scenarioId: string): Promise<PLDoceMeses> {
+  return api.get<PLDoceMeses>(`/pl/${encodeURIComponent(scenarioId)}/doce-meses/`);
+}
+
+// ── Estadísticas del cierre (owner, 2026-09-02) ──────────────────────────────
+//
+// «Ponlo en todos los sub tabs, ya que es información básica» · «ocupo que me
+// derives el ADR y precio cobro promedio de membresías».
+//
+// ⚠️ **Vienen DOS tarifas y no es redundancia.** `adr` es el de las
+// estadísticas del escenario —el que usa el P&L, nunca pasó por las cuentas— y
+// `adr_derivado` es ingreso sobre noches, como lo arma el owner en su hoja. En
+// julio 2026 dan $255,44 y $274,38: la diferencia son $2.500 de «Otros ingresos
+// de operación» que están en `REV_ROOMS` y no son noches vendidas.
+export interface EstadisticasCierre {
+  scenario_id: string; escenario: string; year: number;
+  desde: number; hasta: number;
+  rooms_available: number;
+  rooms_occupied: number;
+  guests: number;
+  occupancy_pct: number;
+  rooms_revenue: number;
+  /** El de las estadísticas del escenario — el que usa el reporte. */
+  adr: number;
+  /** Ingreso de habitaciones ÷ noches ocupadas. */
+  adr_derivado: number;
+  /** Sale del `adr` de las estadísticas, para ser coherente con la tarifa que
+   *  se muestra al lado. */
+  revpar: number;
+  /** El mismo, pero sobre el ingreso completo de habitaciones. */
+  revpar_bruto: number;
+  /** El PROMEDIO de socios de los meses CON socios del período.
+   *
+   *  Owner, 2026-09-02: «cuando presentes un YTD socios pagando, quiero que me
+   *  des un promedio de los meses y no que sume». Los meses en cero quedan
+   *  fuera: Amarena abrió el Club en marzo, e incluir enero y febrero bajaría
+   *  el promedio de 103 a 74.
+   *
+   *  `null` cuando la propiedad NO tiene Club — distinto de cero socios. */
+  club_pagando: number | null;
+  /** El saldo del ÚLTIMO mes: «cuántos socios hay hoy». En un mes suelto
+   *  coincide con el promedio; la diferencia sólo se ve en YTD. */
+  club_pagando_cierre: number | null;
+  club_meses_con_socios: number | null;
+  club_total: number | null;
+  club_socios_mes: number | null;
+  club_revenue: number | null;
+  /** Ingreso del Club ÷ socios-mes. Ponderado, no promedio simple. */
+  club_cuota_promedio: number | null;
+}
+export async function getEstadisticasCierre(
+  scenarioId: string, desde: number, hasta: number,
+): Promise<EstadisticasCierre> {
+  return api.get<EstadisticasCierre>(
+    `/pl/${encodeURIComponent(scenarioId)}/estadisticas/?desde=${desde}&hasta=${hasta}`);
+}
+
+// ── Auditoría del detalle (owner, 2026-09-02) ────────────────────────────────
+//
+// «El otro para ver la auditoría de los detalles.» Cada monto del GL y en qué
+// renglón del P&L terminó, más el cuadre línea a línea contra el motor.
+//
+// ⚠️ La atribución la hace el BACKEND con `pl_engine.linea_de_fila`, que reusa
+// las mismas funciones que arman el P&L. Recalcularla acá sería una segunda
+// verdad — y una auditoría que clasifica distinto que el motor cuadra consigo
+// misma y aprueba justo cuando algo está mal.
+export interface AuditoriaFila {
+  dept_code: string; dept_name: string;
+  account_code: string; account_name: string; outlet: string;
+  /** Ingresos · Costo de ventas · Payroll · Opex · Reparto · Bajo GOP */
+  tipo: string;
+  /** La línea del P&L a la que cae. `null` = huérfana: NO suma en ningún lado. */
+  linea: string | null;
+  monto: number;
+  /** ¿Tuvo movimiento este mes?
+   *
+   *  `false` = es una OPCIÓN del catálogo GL del departamento que este mes no
+   *  se usó, y viene en cero. Owner, 2026-09-03: «todas las opciones que tiene
+   *  cada departamento en cuanto a GL».
+   *
+   *  ⚠️ No es lo mismo que un cero: una cuenta que debería tener monto y no lo
+   *  tiene es invisible si sólo se muestran las que se movieron — el error más
+   *  difícil de encontrar, porque no se ve nada raro, se ve menos. */
+  movimiento: boolean;
+}
+export interface AuditoriaCuadre {
+  /** Qué clase de renglón es, para dibujarlo como un P&L de verdad:
+   *
+   *  - `sec` encabezado de sección (REVENUES, Operating Expenses, OVERHEAD…)
+   *  - `det` un renglón con detalle: es el único que se audita
+   *  - `tot` un total o subtotal
+   *  - `der` derivado (el bloque de Operating Profit): se muestra porque es
+   *    parte del P&L, pero no se compone de asientos
+   *  - `esp` una línea en blanco, para que respire
+   *
+   *  ⚠️ Sin esto salía una lista plana donde **«Rooms» aparecía dos veces**
+   *  —el ingreso y el gasto— sin nada que dijera cuál era cuál. */
+  tipo: "sec" | "det" | "sub" | "tot" | "der" | "esp";
+  /** Un renglón que se busca de un vistazo: Total Revenues, Operating Profit,
+   *  GOP, EBITDA, Net Profit.
+   *
+   *  ⚠️ Lo marca el BACKEND por `line_code`, no la pantalla por el rótulo: el
+   *  texto cambia («TOTAL GROSS OPERATING PROFIT» hoy, otra cosa mañana) y
+   *  comparar textos acá dejaría de resaltar la línea sin que nada fallara. */
+  hito: boolean;
+  linea: string; nombre: string; seccion: string;
+  /** Lo que dice el motor. `null` en secciones y blancos. */
+  motor: number | null;
+  /** Lo que suma el detalle atribuido. `null` cuando no hay nada que auditar:
+   *  un total es suma de otros renglones y un derivado no tiene asientos. */
+  detalle: number | null;
+  dif: number | null;
+}
+export interface AuditoriaDepto {
+  dept_code: string; dept_name: string; total_gasto: number;
+  [columna: string]: string | number;
+}
+export interface Auditoria {
+  scenario_id: string; escenario: string; year: number; mes: number;
+  detalle: AuditoriaFila[];
+  cuadre: AuditoriaCuadre[];
+  departamentos: AuditoriaDepto[];
+  totales: Record<string, number>;
+  columnas: string[];
+  avisos: string[];
+  nota_cuenta_local: string;
+  /** La prueba de que no se descartó nada. Owner: «que haya el 100% de los
+   *  datos siempre». Sin esto, un reporte al que le falta media hoja se ve
+   *  exactamente igual que uno completo. */
+  cobertura: {
+    asientos: number; con_monto: number; en_cero: number;
+    estadisticos: number; monto_estadistico: number;
+    opciones_gl: number; suma_detalle: number;
+  };
+  /** Los tres números de cabecera. `gastos` NO es una línea del P&L: sale de
+   *  la identidad del estado —ingresos menos resultado—, para no inventar una
+   *  segunda aritmética que el día que cambie el P&L deje de cuadrar. */
+  resumen: { ingresos: number; gastos: number; neto: number };
+}
+export async function getAuditoria(
+  scenarioId: string, mes: number,
+): Promise<Auditoria> {
+  return api.get<Auditoria>(
+    `/pl/${encodeURIComponent(scenarioId)}/auditoria/?mes=${mes}`);
+}
+
 // ── P&L Detail: Consolidado · Hotel · Club (owner, 2026-08-27) ───────────────
 export interface PLDetailFila {
   /** sec = encabezado · det = detalle · sub = subtotal · tot = total · esp = espacio */
@@ -2632,7 +2837,11 @@ export interface PLKpis {
   club_total?: number;
   /** Socios-mes del período — el denominador de la cuota, como las noches del ADR. */
   club_socios_mes?: number;
-  /** Ingreso del Club ÷ socios-mes: la cuota mensual promedio. */
+  /** Ingreso del Club ÷ socios-mes: la cuota mensual promedio.
+   *
+   *  En un MES suelto el denominador son los socios de ese mes, así que es
+   *  simplemente ingreso ÷ socios. En un período agregado se pondera por
+   *  socios-mes, igual que el ADR por noches. */
   club_cuota_promedio?: number;
 }
 
@@ -4789,4 +4998,73 @@ export async function correrRondaGuillermo(): Promise<{
   cerradas: number; abiertas: number;
 }> {
   return api.post(`/guillermo/ronda/`, {});
+}
+
+
+// ── El detalle de UNA celda del cuadro ───────────────────────────────────────
+//
+// Owner, 2026-09-03: «toco la línea de Rooms Revenue y me abre el detalle, sin
+// ir… si abro payroll de Rooms se me despliegan los GL que suman eso, como un
+// cuadro sin salir a la otra ventana».
+export interface DetalleCeldaVersion {
+  scenario_id: string;
+  escenario: string;
+  /** De dónde sale el detalle: «Mayor (GL)», «Auxiliar (checkbook)», o —en un
+   *  forecast vivo— «Actual hasta julio · auxiliar de ahí en adelante». */
+  fuente: string;
+  /** Hasta qué mes los números son ACTUALES. 0 = ninguno.
+   *
+   *  ⚠️ Un forecast vivo está compuesto por dos cosas: hasta el corte son los
+   *  actuales cargados y de ahí en adelante lo proyectado. Mostrar las doce
+   *  columnas iguales haría leer como presupuesto lo que ya pasó. */
+  actuals_through?: number;
+  /** El ingreso presupuestado de una línea que agrega VARIAS cuentas del mayor
+   *  (`ROOMS` = 4000 + 4001 + 4002) se muestra como línea, no como cuenta:
+   *  elegir una de las que agrupa sería inventar. */
+  agregado?: boolean;
+}
+export interface DetalleCeldaFila {
+  /** ⚠️ Cada fila trae SU departamento, aunque se haya pedido «todos».
+   *
+   *  Sumando por cuenta a secas, la 7065 de Habitaciones y la 7065 del Club
+   *  caían en la misma fila y el resultado no era de nadie (owner, 2026-09-03:
+   *  «los checkbooks deben estar por departamentos, si no no se puede saber a
+   *  qué corresponde»). */
+  dept_code: string;
+  dept_name: string;
+  cuenta: string;
+  nombre: string;
+  /** Los doce meses, por escenario. */
+  series: Record<string, number[]>;
+}
+export interface DetalleCelda {
+  clase: string; clave: string; rotulo: string;
+  versiones: DetalleCeldaVersion[];
+  filas: DetalleCeldaFila[];
+}
+export async function getDetalleDeCelda(
+  scenarioIds: string[], clase: string, clave: string,
+): Promise<DetalleCelda> {
+  const ids = scenarioIds.filter(Boolean).join(",");
+  return api.get<DetalleCelda>(
+    `/gasto-por-clase/detalle-de-celda/?scenarios=${encodeURIComponent(ids)}`
+    + `&clase=${encodeURIComponent(clase)}&clave=${encodeURIComponent(clave)}`);
+}
+
+
+// ── La columna «Commentary» del P&L Statement ────────────────────────────────
+//
+// Owner, 2026-09-03: «hay una celda al final del P&L que dice Commentary pero
+// no tiene forma para que sea editable».
+export async function getComentariosPL(
+  scenarioId: string, mes: number,
+): Promise<{ comentarios: Record<string, string> }> {
+  return api.get(
+    `/pl/${encodeURIComponent(scenarioId)}/comentarios/?mes=${mes}`);
+}
+export async function guardarComentarioPL(
+  scenarioId: string, ref: string, mes: number, texto: string,
+): Promise<{ guardado: boolean; texto: string }> {
+  return api.put(`/pl/${encodeURIComponent(scenarioId)}/comentarios/`,
+                 { ref, mes, texto });
 }

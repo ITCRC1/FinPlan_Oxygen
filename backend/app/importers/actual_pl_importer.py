@@ -78,7 +78,15 @@ _DEPT_KEYWORDS: list[tuple[str, str]] = [
     ("beneficios", "0181"),
     ("property expenses", "0250"),
     ("management fees", "0250"),
-    ("miscelane", "0240"),
+    # ⚠️ Misceláneos es el **280**, no el 0240. El 0240 NO EXISTE en el
+    # catálogo ni tiene una sola regla de mapeo — el propio `gl_detail_importer`
+    # ya lo dice—, así que este importador mandaba el mismo departamento a un
+    # código inventado mientras el del GL lo mandaba al bueno.
+    #
+    # El ingreso llegaba igual a `REV_MISC_OTHER` (48xx se atribuye por CUENTA,
+    # no por departamento), así que el P&L cuadraba y sólo se veía en el corte
+    # por departamento: un `0240` fantasma que el catálogo no conoce.
+    ("miscelane", "280"),
 ]
 
 
@@ -92,7 +100,19 @@ def dept_code_for_name(name: str | None) -> str:
     for kw, code in _DEPT_KEYWORDS:
         if kw in low:
             return code
-    return ""  # unknown -> pl_engine routes to OTHER_OVERHEAD
+    # ⚠️ Antes acá se devolvía `""` y el motor mandaba la fila a
+    # `OTHER_OVERHEAD`. Medido: esta tabla NO conocía el **Club Madresal (260)**
+    # —el departamento más grande del hotel, 58 puestos y 689 conceptos de
+    # planilla—, ni el Área Recreativa (270), ni la Cocina (0122), el
+    # Restaurante (0123) o la Tienda (0151).
+    #
+    # El del GL sí los conoce. Antes de darse por vencido se le pregunta a él,
+    # que es la tabla más completa: el mismo nombre tiene que dar el mismo
+    # departamento venga por el resumen o por el detalle. Cuando no coinciden,
+    # el gasto cae en una línea u otra según por dónde se cargue el archivo — y
+    # las dos versiones se ven bien por separado.
+    from app.importers.gl_detail_importer import dept_code_from_name
+    return dept_code_from_name(low) or ""
 
 
 def _norm_account(v) -> str | None:

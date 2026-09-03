@@ -1,6 +1,8 @@
 "use client";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
+import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
+  from "@/lib/mesesCerrados";
 import { useTranslations } from "next-intl";
 import AvisoMoneda from "@/components/AvisoMoneda";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
@@ -44,7 +46,11 @@ function fmtUsdTxt(v: string | number) {
   return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
-function NumCell({ value, onSave }: { value: string; onSave: (v: number) => void }) {
+function NumCell({ value, onSave, cerrado }: {
+  value: string; onSave: (v: number) => void;
+  /** El mes ya tiene actuales: se muestra, no se edita. */
+  cerrado?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(money2(value));
 
@@ -52,6 +58,19 @@ function NumCell({ value, onSave }: { value: string; onSave: (v: number) => void
     const n = parseFloat(draft);
     if (!isNaN(n)) onSave(n);
     setEditing(false);
+  }
+
+  // ⚠️ Un mes cerrado NO abre el editor. El backend ya lo rechaza —409 «Jun ya
+  // está cerrado»— pero enterarse al guardar hace perder lo tipeado y parece un
+  // fallo de la app en vez de una regla. Ver `lib/mesesCerrados.ts`.
+  if (cerrado) {
+    return (
+      <td className="mono" title={TITULO_CERRADO}
+          style={{ textAlign: "right", padding: "2px 6px", minWidth: 78,
+                   ...CELDA_CERRADA }}>
+        {fmtUsd(value)}
+      </td>
+    );
   }
 
   return (
@@ -85,6 +104,7 @@ function AccountGroup({
   onAddLines,
   saving,
   addingLines,
+  cerrado,
 }: {
   acct: OpexAccount;
   expanded: boolean;
@@ -94,6 +114,8 @@ function AccountGroup({
   onAddLines: (acct: OpexAccount) => void;
   saving: string | null;
   addingLines: string | null;   // account_code currently being extended
+  /** ¿Este mes (1..12) ya tiene actuales? Lo decide el backend. */
+  cerrado: (mes: number) => boolean;
 }) {
   const t = useTranslations("opexCheckbook");
   const isAdding = addingLines === acct.account_code;
@@ -177,17 +199,19 @@ function AccountGroup({
               {(line.currency ?? "USD") === "CRC" ? "₡ CRC" : "$ USD"}
             </button>
           </td>
-          {MONTH_KEYS.map(mk => (
+          {MONTH_KEYS.map((mk, mi) => (
             (line.currency ?? "USD") === "CRC" ? (
               <NumCell
                 key={mk}
                 value={line.crc_months?.[mk] ?? "0"}
+                cerrado={cerrado(mi + 1)}
                 onSave={v => onSaveEntry(line, `crc_${mk}`, v)}
               />
             ) : (
               <NumCell
                 key={mk}
                 value={line.months[mk] ?? "0"}
+                cerrado={cerrado(mi + 1)}
                 onSave={v => onSaveEntry(line, mk, v)}
               />
             )
@@ -214,6 +238,10 @@ export default function OpexCheckbookPage() {
   const tm = useTranslations("months");
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
+  // Owner, 2026-09-03: «que se ponga gris en señal de que ya no se puede
+  // cambiar». Los meses los decide el backend, que usa la MISMA funcion que el
+  // candado del ORM — copiar la regla aca seria la segunda verdad de siempre.
+  const { cerrado, cerrados } = useMesesCerrados(scenarioId);
   const [scenarios, setScenarios]         = useState<Scenario[]>([]);
   const [depts, setDepts]                 = useState<CwlDept[]>([]);
   const [selectedDept, setSelected]       = useState<string | null>(null);
@@ -642,13 +670,30 @@ export default function OpexCheckbookPage() {
       {/* Checkbook table */}
       {!loading && !error && !deptLoading && checkbook && checkbook.accounts.length > 0 && (
         <div className="fin-sticky" style={{ overflowX: "auto" }}>
+          {cerrados.length > 0 && (
+            <div style={{
+              padding: "8px 12px", marginBottom: 10, borderRadius: 7,
+              border: "1px solid var(--border)",
+              borderLeft: "4px solid var(--brand)",
+              fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)",
+            }}>
+              🔒 <b>Meses cerrados: {cerrados.map(m => MONTHS[m - 1]).join(", ")}.</b>{" "}
+              Ya tienen actuales cargados, así que se muestran en gris y no se
+              editan. El forecast se trabaja de{" "}
+              <b>{MONTHS[Math.max(...cerrados)] ?? ""}</b> en adelante.
+            </div>
+          )}
           <table className="fin-table" style={{ minWidth: 1440, fontSize: 12 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", width: 50 }}>#</th>
                 <th style={{ textAlign: "left", width: 200 }}>{t("colDetail")}</th>
-                {MONTHS.map(m => (
-                  <th key={m} style={{ textAlign: "right", minWidth: 78 }}>{m}</th>
+                {MONTHS.map((m, mi) => (
+                  <th key={m} title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                      style={{ textAlign: "right", minWidth: 78,
+                               ...(cerrado(mi + 1) ? CABECERA_CERRADA : {}) }}>
+                    {m}
+                  </th>
                 ))}
                 <th style={{ textAlign: "right", color: "var(--brand)", minWidth: 90 }}>{tc("annual")}</th>
               </tr>
@@ -665,6 +710,7 @@ export default function OpexCheckbookPage() {
                   onAddLines={handleAddLines}
                   saving={saving}
                   addingLines={addingLines}
+                  cerrado={cerrado}
                 />
               ))}
 

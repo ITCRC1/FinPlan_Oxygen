@@ -636,3 +636,33 @@ thead th { position: sticky; top: var(--nav-h); z-index: 2; background: var(--bg
 /* Formularios y texto seguido. Acá un ancho MENOR es mejor: una línea de 200
    caracteres no se lee. */
 .pag-lectura { max-width: 960px; }
+
+/* ── Una celda que se puede abrir ──────────────────────────────────────────
+   Owner, 2026-09-03: «toco la línea y me abre el detalle… así voy
+   presentando». Y enseguida: «no se ve nada».
+
+   ⚠️ El primer intento fue un subrayado punteado en `--text-disabled`, que en
+   una tabla de doscientos números es invisible. Acá hace falta que se vea SIN
+   pasar el mouse —en una presentación nadie va tanteando la pantalla— y sin
+   competir con las cifras: en un estado de resultados el color ya significa
+   otra cosa (rojo es negativo), así que el aviso es la marca «›» y el
+   subrayado, no el color del texto. */
+.fin-abrible {
+  cursor: pointer;
+  text-decoration: underline dotted var(--border-medium);
+  text-underline-offset: 3px;
+  border-radius: 4px;
+  transition: background 90ms ease;
+}
+.fin-abrible::after {
+  content: "›";
+  margin-left: 5px;
+  font-weight: 700;
+  color: var(--brand);
+  opacity: 0.55;
+}
+.fin-abrible:hover {
+  background: var(--bg-elevated, #EDF1F5);
+  text-decoration-color: var(--brand);
+}
+.fin-abrible:hover::after { opacity: 1; }

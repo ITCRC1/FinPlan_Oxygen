@@ -234,15 +234,24 @@ def test_la_preferencia_es_la_que_pidio_el_owner():
     * 2026-08-19: **vuelven a 2025 y 2024.** El Actual 2026 esta a medio subir
       (junio no esta cargado), asi que la app abria comparando contra un año
       incompleto. Un año incompleto no se ve incompleto: se ve malo.
+    * 2026-09-03: **los tres papeles pasan a 2026.** Owner: «siempre de primero
+      actual, segundo budget 2026 y despues forecast 2026». El ACTUAL 2026 ya
+      va por julio, asi que la razon del 19-ago —comparar contra un año a medio
+      subir— dejo de aplicar. El BUDGET baja de 2027 a 2026 porque los Working
+      2027..2035 estan en CERO: son andamiaje de `ensure-working`, y abrir ahi
+      mostraba un reporte real y perfectamente vacio.
 
-    Que haya ido y vuelto en cinco dias es la razon de que esta prueba exista.
+      `actualAnterior` se queda en 2025: es para los reportes que comparan dos
+      años cerrados, y ahi 2026 contra 2026 no compara nada.
+
+    Que haya ido y vuelto tres veces es la razon de que esta prueba exista.
     """
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
     for esperado in (
-        'budget:         { type: "BUDGET",   year: 2027, version: "Working" }',
+        'actual:         { type: "ACTUAL",   year: 2026 }',
+        'budget:         { type: "BUDGET",   year: 2026, version: "Final" }',
         'forecast:       { type: "FORECAST", year: 2026, version: "Working" }',
-        'actual:         { type: "ACTUAL",   year: 2025 }',
-        'actualAnterior: { type: "ACTUAL",   year: 2024 }',
+        'actualAnterior: { type: "ACTUAL",   year: 2025 }',
     ):
         assert esperado in txt, f"cambio la preferencia del owner: falta {esperado}"
 
@@ -257,7 +266,7 @@ def test_cambiar_la_preferencia_despega_lo_guardado():
 
     La generacion tiene que nombrar la regla que rige HOY."""
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
-    assert 'export const GENERACION = "2026-08-19-actuales-2025-2024";' in txt, (
+    assert 'export const GENERACION = "2026-09-03-los-tres-de-2026";' in txt, (
         "cambiaron los años de la preferencia y no subieron GENERACION: "
         "el owner va a seguir viendo lo viejo")
 
@@ -272,7 +281,19 @@ def test_lo_guardado_se_puede_despegar():
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
     assert "GENERACION" in txt and "limpiarSiEsDeOtraGeneracion" in txt
     # Y la limpieza tiene que alcanzar a las DOS familias de llaves.
-    assert "finplan_planning_scenario" in txt, "la llave compartida de Planning no se limpia"
+    # La llave compartida de Planning tiene que quedar limpia. Ya no se nombra
+    # una por una: la limpieza barre TODO lo que empiece con `finplan` salvo la
+    # sesion, y `finplan_planning_scenario` empieza con `finplan`.
+    #
+    # ⚠️ El prefijo angosto de antes (`finplan_esc_`) es exactamente por lo que
+    # el owner seguia viendo 2035: dejaba afuera `finplan.month-end.pl`, donde
+    # Cierre de Mes guarda sus cuatro ranuras.
+    limpieza = txt[txt.index("export function limpiarSiEsDeOtraGeneracion"):]
+    limpieza = limpieza[:limpieza.index(chr(10) + "}")]
+    assert 'startsWith("finplan")' in limpieza, (
+        "la limpieza volvio a un prefijo angosto: alguna pantalla se queda con "
+        "el escenario viejo pegado")
+    assert "SAGRADAS" in limpieza, "la limpieza puede estar deslogueando al usuario"
     compartido = (FRONT / "lib" / "planningScenario.ts").read_text(encoding="utf-8")
     assert "limpiarSiEsDeOtraGeneracion" in compartido
 

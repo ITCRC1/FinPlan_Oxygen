@@ -215,3 +215,99 @@ def test_la_pantalla_llega_por_las_tres_entradas_del_menu():
         encoding="utf-8")
     for a in AMBITOS:
         assert f"/reports/pl-detail?ambito={a}" in nav, f"falta la entrada de {a}"
+
+
+# ── El reporte calcula, no lee una foto (owner, 2026-08-28) ──────────────────
+
+def test_no_lee_pl_lines():
+    """`pl_lines` es una FOTO: sólo existe si alguien apretó «Recalcular».
+
+    Estos tres reportes la leían, y con los actuales de 2026 salieron en CERO
+    teniendo el mayor cargado —115 filas de marzo a julio— porque el escenario
+    nunca se había recalculado. El dato estaba y el reporte decía que no había
+    nada, que es peor que un error: un cero se lee como una respuesta.
+
+    Ahora salen del mismo `_monthly_results` que Cierre de Mes, el P&L y la
+    Junta. Si alguien vuelve a leer la tabla, los cuatro dejan de coincidir el
+    día que uno se recalcule y el otro no.
+    """
+    fuente = (RAIZ / "app" / "api" / "pl_detail_api.py").read_text(encoding="utf-8")
+    assert "PLLine" not in fuente, (
+        "el reporte volvió a leer `pl_lines`: va a mostrar cero en cualquier "
+        "escenario que no se haya recalculado")
+    assert "_monthly_results" in fuente, (
+        "el reporte tiene que calcular con el mismo motor que el resto de la app")
+
+
+# ── El panel de 12 meses: una sola puerta por numero (owner, 2026-08-28) ─────
+
+def test_el_panel_editable_solo_toca_los_porcentajes():
+    """Owner: «12 meses budget pero que quede editable».
+
+    Los PORCENTAJES viven en `pl_manual_inputs` y ésa es su única puerta. Los
+    MONTOS de abajo del GOP —renta, seguro, capex, depreciación, intereses— ya
+    se digitan en el checkbook de Gastos de Propiedad; ponerlos también acá
+    sería una segunda puerta al mismo número, y el día que difieran nadie
+    sabría cuál mandó. Lo mismo que ya advierte `nonop/management-fees`.
+    """
+    p = (RAIZ.parent / "frontend" / "app" / "month-end" / "pl" /
+         "DoceMeses.tsx").read_text(encoding="utf-8")
+    bloque = p.split("const EDITABLES")[1].split("];")[0]
+    for campo in ("mgmt_fee_pct_3", "mgmt_fee_pct_5", "capital_reserve_pct",
+                  "income_tax_rate"):
+        assert campo in bloque, f"falta {campo} entre los editables"
+    for monto in ("rent", "properties_insurance", "large_capex", "depreciation",
+                  "bank_interest", "capital_reserve\""):
+        assert monto not in bloque, (
+            f"«{monto}» se edita en el checkbook de Gastos de Propiedad: acá "
+            "seria una segunda puerta al mismo numero")
+
+
+def test_el_panel_editable_es_solo_del_budget():
+    """En el panel de Actual no se digita: un actual es lo que paso, no una
+    decision. Editarlo ahi seria reescribir el historico desde un reporte."""
+    p = (RAIZ.parent / "frontend" / "app" / "month-end" / "pl" /
+         "DoceMeses.tsx").read_text(encoding="utf-8")
+    assert 'const editable = panel === "budget";' in p
+
+
+# ── El modo compacto de Cierre de Mes (owner, 2026-08-28) ───────────────────
+
+def _pantalla_cierre() -> str:
+    return (RAIZ.parent / "frontend" / "app" / "month-end" / "pl" /
+            "page.tsx").read_text(encoding="utf-8")
+
+
+def test_se_esconde_solo_lo_que_esta_vacio_en_TODAS_las_versiones():
+    """Owner: «si hay líneas en blanco —budget, actual, ni cualquier otra
+    versión tiene nada— que se esconda».
+
+    «Todas» es la condición, no «alguna»: una línea que el Budget tiene y el
+    Actual todavía no es exactamente la que hay que ver.
+    """
+    s = _pantalla_cierre()
+    bloque = s.split("const lineaVacia")[1].split("}, [usadas, cols]);")[0]
+    assert "usadas.every" in bloque, (
+        "se está escondiendo con `some`: bastaría que UNA versión esté en cero "
+        "para perder una línea que otra sí tiene")
+
+
+def test_esconder_no_es_borrar():
+    """«que se esconda, pero que no desaparezca»: tiene que haber interruptor."""
+    s = _pantalla_cierre()
+    assert "setCompacto" in s and "Compacto" in s
+
+
+def test_la_linea_vuelve_sola_cuando_haya_saldo():
+    """«ahora cuando suba algún saldo, el reporte debe tener esas opciones
+    disponibles».
+
+    Se decide mirando el dato en cada render. Guardar una lista de líneas
+    ocultas sería una segunda verdad que hay que acordarse de actualizar — y la
+    línea NO volvería sola.
+    """
+    s = _pantalla_cierre()
+    assert "useState(true)" in s.split("const [compacto")[1][:40]
+    # El filtro depende del dato, no de una lista guardada.
+    assert "lineaVacia(f.code)" in s
+    assert "localStorage" not in s.split("const visibles")[1][:400]

@@ -34,11 +34,12 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_admin
+from app.auth import get_current_admin, get_current_user
 from app.db import get_db
 from app.errores import ErrorApi
 from app.i18n import DEFAULT_LOCALE, LOCALES, normalize_locale
 from app.models.hotel import Hotel
+from app.models.user import ROLES, User
 from app.models.scenario import Scenario
 from app.models.department_catalog import DepartmentCatalog
 from app.models.dept_enablement import DeptEnablement, DIMENSIONES, SCOPE_KINDS
@@ -669,20 +670,43 @@ class TabFila(BaseModel):
 
 class TabsBody(BaseModel):
     rows: list[TabFila]
+    #: Para quién se guarda. `""` = para todos (la matriz de la propiedad).
+    perfil: str = ""
 
 
 @router.get("/provisioning/{hotel_id}/tabs/")
-async def leer_tabs(hotel_id: str, db: AsyncSession = Depends(get_db)):
-    """Qué está apagado. **Vacío significa que se ve todo**, no que no hay nada."""
+async def leer_tabs(hotel_id: str, perfil: str | None = None,
+                    db: AsyncSession = Depends(get_db),
+                    usuario: User = Depends(get_current_user)):
+    """Qué está apagado. **Vacío significa que se ve todo**, no que no hay nada.
+
+    `perfil` decide para quién se pregunta, y el default es lo que hace que esto
+    funcione sin tocar la barra:
+
+    * **sin `perfil`** — se contesta por el perfil de QUIEN LLAMA. Así la barra
+      pide lo mismo de siempre y cada quien recibe su vista sin que el front
+      tenga que saber de roles.
+    * **`perfil=""`** — la matriz cruda de la propiedad, sin mezclar. Es lo que
+      pide la pantalla de provisionamiento para editarla.
+    * **`perfil=viewer`** — lo de la propiedad más lo de ese perfil, que es lo
+      que ese rol termina viendo.
+
+    ⚠️ La diferencia entre «no vino» y «vino vacío» es la que evita que la
+    pantalla de administración se edite a sí misma con la vista de quien la
+    abrió: sin ella, un admin que apague algo para lectores lo apagaría para
+    todos sin darse cuenta.
+    """
     from app.api._apagados import tabs_apagados
 
     hotel = await db.get(Hotel, hotel_id)
     if hotel is None:
         raise ErrorApi(404, "propiedad.no_encontrada")
 
-    apagados = await tabs_apagados(db, hotel_id)
+    efectivo = usuario.role if perfil is None else perfil
+    apagados = await tabs_apagados(db, hotel_id, efectivo)
     return {
         "hotel_id": hotel_id,
+        "perfil": efectivo,
         "apagados": apagados,
         "total_apagados": sum(len(v) for v in apagados.values()),
         "nota": ("Esconde de la barra; no es un permiso. La ruta sigue "
@@ -712,10 +736,19 @@ async def guardar_tabs(hotel_id: str, body: TabsBody,
             raise ErrorApi(422, "provisionamiento.scope_desconocido",
                            scope=r.scope_kind)
 
+    # ⚠️ Se guarda SÓLO sobre el perfil que se está editando. Si el filtro
+    # incluyera las filas de todos, apagar algo para lectores borraría la fila
+    # global con el mismo nombre — y la decisión de la propiedad se perdería
+    # desde una pantalla que dice estar tocando un perfil.
+    perfil = (body.perfil or "").strip()
+    if perfil and perfil not in ROLES:
+        raise ErrorApi(422, "usuario.rol_invalido", roles=ROLES)
+
     existentes = {
         (r.scope_kind, r.clave): r
         for r in (await db.execute(select(TabEnablement).where(
-            TabEnablement.hotel_id == hotel_id))).scalars().all()
+            TabEnablement.hotel_id == hotel_id,
+            TabEnablement.perfil == perfil))).scalars().all()
     }
 
     apagados = prendidos = 0
@@ -727,11 +760,15 @@ async def guardar_tabs(hotel_id: str, body: TabsBody,
                 prendidos += 1
         elif fila is None:
             db.add(TabEnablement(hotel_id=hotel_id, scope_kind=r.scope_kind,
-                                 clave=r.clave[:60], visible=False))
+                                 clave=r.clave[:60], perfil=perfil,
+                                 visible=False))
             apagados += 1
 
     await db.commit()
     from app.api._apagados import tabs_apagados
 
-    return {"apagados": apagados, "prendidos": prendidos,
-            "estado": await tabs_apagados(db, hotel_id)}
+    # El estado que se devuelve es el del perfil editado, crudo — no la unión:
+    # la pantalla acaba de escribir esa matriz y es la que tiene que ver de
+    # vuelta. `""` ya significa «la de la propiedad».
+    return {"apagados": apagados, "prendidos": prendidos, "perfil": perfil,
+            "estado": await tabs_apagados(db, hotel_id, perfil or None)}

@@ -1073,11 +1073,30 @@ async def budget_to_forecast_current(budget_id: str, db: AsyncSession = Depends(
     return {**_scenario_summary(new), "label": f"Forecast Current {budget.year}"}
 
 
+#: Las versiones que NO se borran: son los entregables del año.
+#:
+#: Medido en producción: las versiones que existen son exactamente estas dos
+#: —`Working` y `Final`—, nada de `Working 2026` ni variantes.
+VERSIONES_PROTEGIDAS = {"working", "final"}
+
+
 def is_protected_version(version: str) -> bool:
-    """Versiones protegidas: NO se pueden borrar (Working y Final son entregables
-    importantes que deben quedar). Los Draft y demás sí se pueden borrar."""
-    v = (version or "").strip().lower()
-    return "working" in v or "final" in v
+    """¿Esta versión está protegida contra borrado?
+
+    Compara el nombre COMPLETO, no por subcadena.
+
+    ⚠️ Antes era `"working" in v`, y eso protegía de más: un `Working-VIEJO`
+    —una copia que el usuario deja al lado mientras rehace la buena— quedaba
+    imborrable para siempre, sin ninguna forma de sacarlo de la lista de
+    escenarios. La intención de la regla es cuidar EL entregable, no cualquier
+    cosa que tenga la palabra adentro.
+
+    Owner, 2026-09-03: que `Working-VIEJO` deje de estar protegido.
+
+    El `strip().lower()` queda: cuida el `Working ` con espacio de más y el
+    `WORKING` de un import, que sí son el entregable.
+    """
+    return (version or "").strip().lower() in VERSIONES_PROTEGIDAS
 
 
 @router.delete("/scenarios/{scenario_id}/", status_code=204)
@@ -1390,6 +1409,12 @@ def _scenario_summary(s: Scenario) -> dict:
         "source_mode": getattr(s, "source_mode", "imported"),
         "created_by": s.created_by,
         "created_at": s.created_at.isoformat() if s.created_at else None,
+        # ⚠️ Quién decide si se puede borrar viaja EN el escenario, para que la
+        # pantalla no tenga que deducirlo. Estaba escrito tres veces —acá y en
+        # dos pantallas, cada una con su regex— y el día que difirieran el
+        # botón de borrar iba a aparecer sobre algo protegido, o a esconderse
+        # sobre algo borrable. Que es justo lo que pasó con `Working-VIEJO`.
+        "protected": is_protected_version(s.version),
     }
 
 

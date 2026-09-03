@@ -1,4 +1,6 @@
 "use client";
+import BloqueSeguro from "@/components/BloqueSeguro";
+import { borrarFilaReparto } from "@/lib/api";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
@@ -269,6 +271,32 @@ export default function AllocationsConfigPage() {
     setLauRows(rows => rows.map((r, i) => i === idx ? { ...r, participates: !r.participates } : r));
   }
 
+  /** Saca una fila de la matriz.
+   *
+   *  ⚠️ Borra en el SERVIDOR y no solo en la pantalla. Quitarla de la lista
+   *  local y guardar no la borraria: el guardado hace upsert fila por fila y no
+   *  sabe que una desaparecio — es exactamente lo que dejo pegada la `110`
+   *  cuando el owner corrigio el codigo a `0110`.
+   *
+   *  No recalcula: saca la fila y deja los asientos. Rehacer el reparto es el
+   *  boton de al lado, y asi se puede limpiar la matriz sin mover numeros. */
+  async function borrarFila(tipo: "laundry" | "cafeteria", dept: string) {
+    if (!scenarioId) return;
+    if (!confirm(dept
+      ? `¿Sacar el departamento ${dept} de la matriz de reparto?`
+      : "¿Sacar la fila sin departamento?")) return;
+    try {
+      await borrarFilaReparto(tipo, scenarioId, dept);
+      if (tipo === "laundry") {
+        setLauRows(rows => rows.filter(r => (r.dept_code || "") !== dept));
+      } else {
+        setCafRows(rows => rows.filter(r => (r.dept_code || "") !== dept));
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo borrar la fila");
+    }
+  }
+
   function updateLauField(idx: number, field: "dept_code" | "dept_name", value: string) {
     setDirty(true);
     setLauRows(rows => rows.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -483,11 +511,13 @@ export default function AllocationsConfigPage() {
 
       const repCaf = cuadroReparto("CAFETERIA", t("xlsSheetCafSplit"));
       if (repCaf) cuadros.push(repCaf);
-      if (calcResult) cuadros.push(cuadroMensual(calcResult.monthly.cafeteria,
+      // El desglose mes a mes solo viaja si el endpoint lo manda; hoy no lo
+      // hace. Lo que el reparto hizo de verdad esta en los cuadros de arriba.
+      if (calcResult?.monthly) cuadros.push(cuadroMensual(calcResult.monthly.cafeteria,
         `${t("xlsCalcResult")} — ${t("cafeteria")}`, t("xlsSheetCafMonthly")));
 
       // Validación: el reparto de cafetería tiene que netear $0 cada mes.
-      if (summary && Object.keys(summary.CAFETERIA).length) {
+      if (summary?.CAFETERIA && Object.keys(summary.CAFETERIA).length) {
         const caf = summary.CAFETERIA;
         const depts = Object.keys(caf).sort();
         const receivers = depts.filter(d => d !== "0220");
@@ -585,10 +615,10 @@ export default function AllocationsConfigPage() {
 
       const repLau = cuadroReparto("LAUNDRY", t("xlsSheetLauSplit"));
       if (repLau) cuadros.push(repLau);
-      if (calcResult) cuadros.push(cuadroMensual(calcResult.monthly.laundry,
+      if (calcResult?.monthly) cuadros.push(cuadroMensual(calcResult.monthly.laundry,
         `${t("xlsCalcResult")} — ${t("laundry")}`, t("xlsSheetLauMonthly")));
 
-      if (breakdown && breakdown.total_cost.some(v => Math.abs(v) > 0.5)) {
+      if (breakdown?.total_cost?.some(v => Math.abs(v) > 0.5)) {
         const acc = breakdown.accounts;
         const ann = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
         const sumDepts = (m: Record<string, number[]>, mi: number) =>
@@ -949,6 +979,13 @@ export default function AllocationsConfigPage() {
                         style={{ cursor: "pointer", accentColor: "var(--brand)" }}
                       />
                     </td>
+                    <td style={{ textAlign: "center" }}>
+                      <button onClick={() => borrarFila("cafeteria", row.dept_code || "")}
+                        title="Sacar esta fila de la matriz"
+                        style={{ border: "none", background: "none", cursor: "pointer",
+                                 color: "var(--text-disabled)", fontSize: 13,
+                                 padding: "0 4px" }}>×</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1098,6 +1135,13 @@ export default function AllocationsConfigPage() {
                           <input type="checkbox" checked={row.participates}
                             onChange={() => toggleLauParticipates(idx)}
                             style={{ cursor: "pointer", accentColor: "var(--brand)" }} />
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <button onClick={() => borrarFila("laundry", row.dept_code || "")}
+                            title="Sacar esta fila de la matriz"
+                            style={{ border: "none", background: "none", cursor: "pointer",
+                                     color: "var(--text-disabled)", fontSize: 13,
+                                     padding: "0 4px" }}>×</button>
                         </td>
                       </tr>
                     );
@@ -1425,7 +1469,8 @@ export default function AllocationsConfigPage() {
               })}
             </div>
           )}
-          {calcResult.total_entries > 0 && calcResult.monthly.laundry.every(m => m.rows === 0) && (
+          {calcResult.total_entries > 0
+            && calcResult.monthly?.laundry?.every(m => m.rows === 0) && (
             <div style={{
               marginBottom: 16, padding: "10px 14px", borderRadius: 4, fontSize: 12,
               background: "rgba(255,193,7,0.08)", color: "var(--warning, #FFC107)",
@@ -1437,9 +1482,23 @@ export default function AllocationsConfigPage() {
               })}
             </div>
           )}
+          {/* ⚠️ El desglose mes a mes SOLO se dibuja si el endpoint lo mando.
+              `POST /calculate/` dejo de mandarlo cuando paso a delegar en
+              `_recalc_allocations`, y la pantalla lo seguia leyendo: de ahi
+              salia el «Cannot read properties of undefined (reading
+              'laundry')» que dejaba la pantalla en blanco al recalcular.
+              Sin el, lo que el reparto hizo se lee igual en los cuadros de
+              validacion de mas abajo, que salen de `/summary/`. */}
+          {!calcResult.monthly && calcResult.total_entries > 0 && (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)",
+                          marginBottom: 14 }}>
+              Se generaron <b>{calcResult.total_entries}</b> asientos de reparto.
+              El detalle está en los cuadros de validación de abajo.
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, maxWidth: 620 }}>
             {/* Cafetería monthly */}
-            {tab === "cafeteria" && (
+            {calcResult.monthly && tab === "cafeteria" && (
             <div style={{ background: "var(--bg-surface)", borderRadius: 6, padding: 14 }}>
               <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
                 {t("cafeteria")}
@@ -1453,7 +1512,7 @@ export default function AllocationsConfigPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calcResult.monthly.cafeteria.map(m => (
+                  {(calcResult.monthly?.cafeteria ?? []).map(m => (
                     <tr key={m.month}>
                       <td>{MONTHS[m.month - 1]}</td>
                       <td className="mono" style={{ textAlign: "right" }}>
@@ -1471,7 +1530,7 @@ export default function AllocationsConfigPage() {
             )}
 
             {/* Lavandería monthly */}
-            {tab === "laundry" && (
+            {calcResult.monthly && tab === "laundry" && (
             <div style={{ background: "var(--bg-surface)", borderRadius: 6, padding: 14 }}>
               <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
                 {t("laundry")}
@@ -1485,7 +1544,7 @@ export default function AllocationsConfigPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calcResult.monthly.laundry.map(m => (
+                  {(calcResult.monthly?.laundry ?? []).map(m => (
                     <tr key={m.month}>
                       <td>{MONTHS[m.month - 1]}</td>
                       <td className="mono" style={{ textAlign: "right" }}>
@@ -1505,7 +1564,14 @@ export default function AllocationsConfigPage() {
       )}
 
       {/* ── Validación: desglose Cafetería por departamento (cuenta 6025) ──── */}
-      {tab === "cafeteria" && summary && Object.keys(summary.CAFETERIA).length > 0 && (() => {
+      <BloqueSeguro nombre="Validacion de cafeteria">
+      {/* ⚠️ `summary?.CAFETERIA` y no `summary.CAFETERIA`. Esta condicion se
+          evalua en el render del PADRE —para decidir que hijo pasarle a la
+          red—, asi que si revienta aca el `BloqueSeguro` no la atrapa: el
+          error ocurre antes de que exista el hijo. Es la razon por la que la
+          red de abajo no evito la pantalla en blanco. */}
+      {tab === "cafeteria" && summary?.CAFETERIA
+        && Object.keys(summary.CAFETERIA).length > 0 && (() => {
         const caf = summary.CAFETERIA;
         const nm = (dc: string) =>
           cafRows.find(r => r.dept_code === dc)?.dept_name ??
@@ -1585,9 +1651,13 @@ export default function AllocationsConfigPage() {
           </div>
         );
       })()}
+      </BloqueSeguro>
 
       {/* ── Validación: desglose Lavandería 3 vías ──────────────────────────── */}
-      {tab === "laundry" && breakdown && breakdown.total_cost.some(v => Math.abs(v) > 0.5) && (() => {
+      <BloqueSeguro nombre="Desglose de lavanderia">
+      {/* Mismo motivo: `total_cost` puede no venir y la condicion corre fuera
+          de la red. */}
+      {tab === "laundry" && breakdown?.total_cost?.some(v => Math.abs(v) > 0.5) && (() => {
         const nm = (dc: string) =>
           lauRows.find(r => r.dept_code === dc)?.dept_name ??
           cafRows.find(r => r.dept_code === dc)?.dept_name ?? dc;
@@ -1978,6 +2048,7 @@ export default function AllocationsConfigPage() {
           </div>
         );
       })()}
+      </BloqueSeguro>
     </div>
   );
 }

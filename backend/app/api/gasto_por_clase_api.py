@@ -35,9 +35,13 @@ from sqlalchemy import select
 from app.errores import ErrorApi
 from app.auth import get_current_user
 from app.db import get_session
+from app.engine import pl_engine
+from app.models.mapping import AccountMapping
+from app.nombres_cuenta import limpiar_nombre
 from app.engine import recalculate as recalc
 from app.models.actual_entry import ActualEntry
 from app.models.belowgop_account_entry import BelowGopAccountEntry
+from app.models.nonop_entry import NonOpEntry
 from app.models.pl_line import PLLine
 from app.models.scenario import Scenario
 
@@ -103,9 +107,38 @@ def _nombra(destino: dict, clave: str, nombre: str):
     """Guarda el nombre de una cuenta la primera vez que se la ve.
 
     El gasto de propiedad se abre por cuenta, y una lista de numeros sueltos
-    —8005, 8020, 8040— no le dice nada a nadie (owner, 2026-08-14)."""
-    if nombre:
-        destino.setdefault("__nombres__", {}).setdefault(clave, nombre)
+    —8005, 8020, 8040— no le dice nada a nadie (owner, 2026-08-14).
+
+    ⚠️ El nombre se LIMPIA antes de guardarlo. `account_name` y
+    `account_name_example` traen todas las variantes que aparecieron en el
+    mayor pegadas con barras —«DEPRECIATION1 | DEPRECIATION2 | DEPRECIATION4 |
+    DEPRECIATION»—, que son sesenta caracteres donde caben veinte: el rótulo se
+    montaba encima de los montos (owner, 2026-09-03).
+    """
+    limpio = limpiar_nombre(nombre)
+    if limpio:
+        destino.setdefault("__nombres__", {}).setdefault(clave, limpio)
+
+
+def _padre(dept: str) -> str:
+    """El departamento del P&L al que pertenece un sub-departamento.
+
+    ⚠️ **Sube en CADENA.** `pl_engine.consolidate_dept` resuelve un escalon, y
+    hay cadenas de dos: el 0132 cuelga del 0130 y el 0130 del 0140. Con una
+    sola vuelta la planilla del Spa quedaba en un departamento intermedio que
+    el cuadro no dibuja.
+
+    El tope de vueltas evita un ciclo si alguien deja mal el catalogo: mejor
+    quedarse en el ultimo codigo bueno que colgar el reporte.
+    """
+    visto = set()
+    for _ in range(5):
+        padre = pl_engine.consolidate_dept(dept)
+        if padre == dept or padre in visto:
+            return dept
+        visto.add(dept)
+        dept = padre
+    return dept
 
 
 def _suma(destino: dict, clase: str, clave: str, mes: int, monto):
@@ -123,10 +156,54 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
     apertura por departamento (y por cuenta, para la clase 8)."""
     filas = []
 
+    # Se necesita el escenario, no sólo su id: el tipo y `actuals_through`
+    # deciden de dónde sale el gasto de cada mes — ver la mezcla más abajo.
+    escenario = await session.get(Scenario, scenario_id)
+    if escenario is None:
+        return filas
+
     # Clase 8 del presupuesto: vive en su propio checkbook, con la cuenta en la
     # fila. Se lee una vez y se reparte por mes, en vez de doce consultas.
-    below = (await session.execute(select(BelowGopAccountEntry).where(
-        BelowGopAccountEntry.scenario_id == scenario_id))).scalars().all()
+    #
+    # ⚠️ **`NonOpEntry`, que es lo que lee el P&L — y no `BelowGopAccountEntry`.**
+    #
+    # Owner, 2026-09-03, cotejando su Excel: el gasto de propiedad daba
+    # $116.207,21 en el P&L y $20.585,21 en este cuadro. No era un error de
+    # calculo: el below-GOP vive en DOS tablas y cada pantalla leia una. Los
+    # honorarios (8005) tenian 68.337,08 en una y 18.915,01 en la otra, y cual
+    # numero veias dependia de por que pantalla entraras.
+    #
+    # `recalculate.belowgop_by_line` siembra las lineas del P&L desde
+    # `NonOpEntry`: esa es la fuente. Este cuadro pasa a leer la misma, asi las
+    # dos pantallas no pueden contar versiones distintas del mismo gasto.
+    #
+    # El NOMBRE de cada cuenta se sigue buscando en la tabla vieja: `NonOpEntry`
+    # lo trae casi siempre vacio, y una lista de 8005, 8015, 8020 no le dice
+    # nada a nadie.
+    below = (await session.execute(select(NonOpEntry).where(
+        NonOpEntry.scenario_id == scenario_id))).scalars().all()
+    nombres_bg = {
+        (e.account_code or "").strip(): e.account_name
+        for e in (await session.execute(select(BelowGopAccountEntry).where(
+            BelowGopAccountEntry.scenario_id == scenario_id))).scalars()
+        if e.account_name
+    }
+
+    # Las lineas de INGRESO del P&L, por mes. Se leen una vez, no doce.
+    #
+    # `TOTAL_REVENUES` y `SEC_REVENUES` son agregados —el total y el encabezado
+    # de la seccion—: incluirlos duplicaria el ingreso en el cuadro, y el error
+    # se veria como «el doble», que es de los que pasan desapercibidos porque
+    # todo sigue sumando consigo mismo.
+    lineas_ingreso: dict[int, list] = {}
+    if detalle is not None:
+        for ln in (await session.execute(select(PLLine).where(
+                PLLine.scenario_id == scenario_id,
+                PLLine.section == "REVENUES",
+                PLLine.line_code.notin_(["TOTAL_REVENUES", "SEC_REVENUES"]),
+        ))).scalars().all():
+            lineas_ingreso.setdefault(ln.month, []).append(ln)
+            _nombra(detalle, ln.line_code, ln.line_name or "")
 
     # Las lineas de INGRESO del P&L, por mes. Se leen una vez, no doce.
     #
@@ -152,8 +229,23 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
                 ActualEntry.scenario_id == scenario_id))).scalars().all():
             if (f.account_code or "").startswith("8"):
                 _nombra(detalle, f.account_code, f.account_name or "")
+        # ⚠️ `NonOpEntry.account_name` está VACÍO en las 18 filas de producción,
+        # en los tres escenarios. Sin un respaldo, el 8000 y el 8020 salían
+        # como número pelado — que es justo lo que este bloque vino a evitar.
+        #
+        # El catálogo sí los tiene: 8000 es RENT y 8020 es CAPITAL RESERVE. Se
+        # lee UNA vez, no una por cuenta.
+        del_catalogo = {
+            (m.account_code or "").strip(): m.account_name_example
+            for m in (await session.execute(select(AccountMapping).where(
+                AccountMapping.active_status == "YES",
+                AccountMapping.account_code.like("8%")))).scalars()
+        }
         for e in below:
-            _nombra(detalle, str(e.account_code or ""), e.account_name or "")
+            cod = str(e.account_code or "")
+            _nombra(detalle, cod,
+                    e.account_name or nombres_bg.get(cod, "")
+                    or del_catalogo.get(cod, ""))
 
     for m in range(1, 13):
         col = MESES[m - 1]
@@ -167,7 +259,31 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
         #
         # Manda el GL cuando el mes lo tiene, porque es el dato real; si no hay,
         # se cae a los checkbooks, que es lo proyectado.
-        filas_gl = await recalc.actual_rows_for_month(session, scenario_id, m)
+        # ⚠️ **En un mes CERRADO de un forecast, el gasto sale del ACTUAL.**
+        #
+        # Owner, 2026-09-03, comparando dos cuadros. Este endpoint leía siempre
+        # el mayor del PROPIO escenario, y un forecast no tiene mayor: caía
+        # siempre al checkbook. Resultado, en el FORECAST Working 2026 con
+        # corte en julio:
+        #
+        #     marzo, abril, mayo -> 0 en el cuadro y 12.189 / 25.851 / 56.027
+        #                           en el P&L (el forecast no tiene checkbook
+        #                           de esos meses; el ACTUAL sí tiene el mayor)
+        #     junio, julio       -> 42.658 y 12.370 DE MÁS: mostraba lo
+        #                           presupuestado sobre meses que ya cerraron
+        #
+        # Los dos cuadros salían de datos distintos y ninguno decía cuál. La
+        # mezcla es la misma que hace `compute_pl_month`: hasta
+        # `actuals_through` manda el ACTUAL enlazado, y de ahí en adelante el
+        # propio escenario. Rehacerla acá con otro criterio sería exactamente
+        # cómo el resumen y el P&L terminan contando dos historias.
+        origen_gl = scenario_id
+        if escenario.type == "FORECAST" and m <= (escenario.actuals_through or 0):
+            enlazado = await recalc.linked_actual_scenario(session, escenario)
+            if enlazado is not None:
+                origen_gl = enlazado.id
+
+        filas_gl = await recalc.actual_rows_for_month(session, origen_gl, m)
         if filas_gl:
             for r in filas_gl:
                 cuenta = str(r["account_code"] or "")
@@ -184,7 +300,30 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
                 # ⚠️ Solo del GASTO. La primera version cortaba antes de mirar la
                 # clase y se llevaba puesto el INGRESO de la lavanderia: la venta
                 # del año bajaba 3,450 sin que nada lo dijera.
-                if cuenta[:1] in ("5", "6", "7") and dept in EXCLUIR_DE_GASTO:
+                # ⚠️ El gasto de un departamento de REPARTO se cuenta, y su
+                # crédito de distribución lo netea. Antes se descartaba el
+                # departamento entero, y eso PERDÍA PLATA:
+                #
+                # el ACTUAL tiene el costo de Lavandería en el mayor —$1.121,36
+                # en julio 2026, entre planilla y suministros— pero **cero
+                # asientos de reparto**, porque un histórico no se reparte: se
+                # sube como vino. La exclusión se lo llevaba y nada lo devolvía.
+                #
+                # Resultado: este cuadro decía 119.032,01 de gasto donde el P&L
+                # dice 120.153,37. Y la diferencia iba contra el resultado, o
+                # sea que el mes se veía MEJOR de lo que fue.
+                #
+                # El motor no lo descarta: lo que no alcanzó a repartirse queda
+                # en overhead (`OH_LAUNDRY`), que es la regla del owner del
+                # 2026-08-28 —«si tiene saldo que aparezca esa diferencia en
+                # overhead»—. Acá se hace lo mismo por aritmética: el costo
+                # entra y el crédito 49xx lo saca, así que en un escenario CON
+                # reparto la cuenta da lo mismo que antes, y en uno sin reparto
+                # ya no desaparece el sobrante.
+                if cuenta in CUENTAS_DE_REPARTO:
+                    opex += monto
+                    if detalle is not None:
+                        _suma(detalle, "opex", _padre(dept), m, monto)
                     continue
                 if cuenta.startswith("5"):
                     cost += monto
@@ -202,22 +341,77 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
                         _suma(detalle, "property", cuenta, m, monto)
                 elif (cuenta.startswith("4") and detalle is not None
                         and cuenta not in CUENTAS_DE_REPARTO):
-                    _suma(detalle, "revenue", FUSION_INGRESO.get(dept, dept), m, monto)
+                    # ⚠️ **El ingreso se indexa por LINEA, no por departamento**,
+                    # y es lo que hace que el cuadro tenga una fila por concepto.
+                    #
+                    # Owner, 2026-09-02: *«necesito que los ingresos aparezcan en
+                    # una sola linea; podes consolidar las lineas para no verlas
+                    # separadas por tipo de ingreso»*.
+                    #
+                    # Las dos ramas de este endpoint traen el ingreso de fuentes
+                    # que se indexan distinto: el mayor por DEPARTAMENTO (0110,
+                    # 260…) y el checkbook por LINEA (`REV_ROOMS`, `REV_CLUB`…),
+                    # porque un presupuesto de ingresos no tiene departamento.
+                    # Con dos vocabularios el mismo concepto salia DOS VECES —
+                    # «REV_ROOMS · Rooms Revenue» con el presupuesto y el actual
+                    # en cero, y «0110 · Rooms / Habitaciones» al reves— y cada
+                    # una mostraba una variacion de -100%.
+                    #
+                    # La linea es el unico vocabulario que ambos lados pueden
+                    # hablar: el departamento no existe del lado del presupuesto.
+                    # `linea_de_fila` la resuelve con las mismas funciones del
+                    # motor y devuelve el codigo CANONICO, que es el que trae
+                    # `pl_lines` en la otra rama.
+                    ln_rev, _tipo = pl_engine.linea_de_fila(cuenta, dept)
+                    # Sin linea no se descarta: se cae al departamento. Perder
+                    # plata en silencio seria peor que una fila con nombre feo.
+                    clave_rev = ln_rev or FUSION_INGRESO.get(dept, dept)
+                    _suma(detalle, "revenue", clave_rev, m, monto)
         else:
             pbd = await recalc.payroll_by_dept(session, scenario_id, m)
             cbd = await recalc.cos_by_dept(session, scenario_id, m)
             obd = await recalc.opex_by_dept(session, scenario_id, m)
-            pbd = {d: v for d, v in pbd.items() if d not in EXCLUIR_DE_GASTO}
-            cbd = {d: v for d, v in cbd.items() if d not in EXCLUIR_DE_GASTO}
-            obd = {d: v for d, v in obd.items() if d not in EXCLUIR_DE_GASTO}
+            # ⚠️ El gasto de los departamentos de reparto SE CUENTA, y su
+            # crédito de distribución lo netea. Sacarlos de un lado y no sumar
+            # el otro perdía el SOBRANTE: lo que no alcanzó a repartirse.
+            #
+            # Medido en el BUDGET 2026: entre 1.361 y 1.493 por mes, todos los
+            # meses. El motor lo pone en overhead (`OH_LAUNDRY`) —regla del
+            # owner del 2026-08-28: «si tiene saldo que aparezca esa diferencia
+            # en overhead»— y acá desaparecía, así que el mes se veía mejor de
+            # lo que era.
+            abd = await recalc.alloc_by_dept(session, scenario_id, m)
             payroll = sum(pbd.values(), ZERO)
             cost = sum(cbd.values(), ZERO)
-            opex = sum(obd.values(), ZERO)
+            opex = sum(obd.values(), ZERO) + sum(abd.values(), ZERO)
             prop = sum((Decimal(str(getattr(e, col) or 0)) for e in below), ZERO)
             if detalle is not None:
+                # El reparto entra en la apertura de opex, igual que en el
+                # total: si saliera sólo del total, el renglón TOTAL del cuadro
+                # no sumaría sus propias filas.
+                obd = {**obd, **{d: obd.get(d, ZERO) + v for d, v in abd.items()}}
+
                 def _abrir(clase, datos):
                     for d, v in datos.items():
-                        _suma(detalle, clase, d, m, v)
+                        # ⚠️ **El sub-departamento se sube a su padre.**
+                        #
+                        # Owner, 2026-09-02, mirando el desglose: el ACTUAL
+                        # consolida en departamentos padre y el checkbook usa
+                        # sub-departamentos, asi que el cuadro salia con dos
+                        # juegos de filas que no se cruzaban — `0110 · Rooms`
+                        # con 38.054,38 y cero presupuesto, y `0111 · Front
+                        # Desk`, `0113 · Housekeeping`, `0114 · Concierge` con
+                        # presupuesto y cero actual. Comparar planilla por
+                        # departamento no decia nada.
+                        #
+                        # Es el mismo defecto que el del ingreso, resuelto el
+                        # mismo dia: dos vocabularios para la misma dimension.
+                        # `consolidate_dept` es el mapa que el motor YA usa en
+                        # el camino de checkbook (`CHECKBOOK_DEPT_CONSOLIDATION`),
+                        # asi que el cuadro pasa a agrupar como el P&L.
+                        #
+                        # No cambia ningun total: solo junta claves.
+                        _suma(detalle, clase, _padre(d), m, v)
                 _abrir("payroll", pbd)
                 _abrir("cost", cbd)
                 _abrir("opex", obd)

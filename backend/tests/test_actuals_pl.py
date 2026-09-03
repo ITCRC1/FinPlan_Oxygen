@@ -119,20 +119,47 @@ def test_account_4900_treated_as_allocation():
     assert get_line(pl, "OPEXP_LAUNDRY") == Decimal("0")
 
 
-def test_cafeteria_dept_excluded_from_actuals():
-    """Dept 0220 (cafetería) is dropped — its cost is already in dept payroll (6025)."""
+def test_el_saldo_de_la_cafeteria_sale_en_overhead():
+    """Owner, 2026-08-28: «que salga ese saldo en overhead».
+
+    Antes el 0220 se DESCARTABA del P&L de actuales —su costo ya viaja en la
+    planilla de cada departamento por el 6025— y este test lo blindaba. El
+    razonamiento valía mientras el reparto cubriera el gasto; cuando no, lo que
+    se tiraba era el SOBRANTE y desaparecía sin dejar rastro.
+
+    Ahora no se excluye a nadie: la aritmética netea, y lo que sobra se ve.
+    """
     rows = [
         {"account_code": "4000", "dept_code": "0110", "amount": Decimal("100000")},
-        {"account_code": "6025", "dept_code": "0110", "amount": Decimal("500")},   # cafe benefit in dept
-        {"account_code": "6000", "dept_code": "0220", "amount": Decimal("11916")}, # cafe pool — excluded
-        {"account_code": "7400", "dept_code": "0220", "amount": Decimal("3000")},  # excluded
+        {"account_code": "6025", "dept_code": "0110", "amount": Decimal("500")},
+        {"account_code": "6000", "dept_code": "0220", "amount": Decimal("11916")},
+        {"account_code": "7400", "dept_code": "0220", "amount": Decimal("3000")},
+        # El credito de Distribucion saca 14,416 de los 14,916: sobran 500.
+        {"account_code": "4900", "dept_code": "0220", "amount": Decimal("-14416")},
     ]
     inp = build_actual_inputs(rows)
-    # nothing from dept 0220 leaks into the P&L inputs
-    assert "0220" not in inp["payroll_by_dept"]
-    assert "0220" not in inp["opex_by_dept"]
+    assert inp["payroll_by_dept"]["0220"] == Decimal("11916")
+    assert inp["opex_by_dept"]["0220"] == Decimal("3000")
+    assert inp["alloc_by_dept"]["0220"] == Decimal("-14416")
+
     pl = calculate_full_pl(**inp)
-    # GOP = 100000 revenue − 500 (the 6025 in rooms); cafetería pool excluded
+    # El sobrante, en OVERHEAD y no arriba del GOP.
+    assert get_line(pl, "OVH_CAFETERIA") == Decimal("500")
+    # GOP = 100,000 de ingreso − 500 del 6025 en Rooms − 500 de sobrante.
+    assert abs(get_line(pl, "GOP") - Decimal("99000")) < Decimal("0.01")
+
+
+def test_la_cafeteria_que_reparte_todo_no_deja_rastro():
+    """El caso de siempre: con el reparto completo el resultado no cambia."""
+    rows = [
+        {"account_code": "4000", "dept_code": "0110", "amount": Decimal("100000")},
+        {"account_code": "6025", "dept_code": "0110", "amount": Decimal("500")},
+        {"account_code": "6000", "dept_code": "0220", "amount": Decimal("11916")},
+        {"account_code": "7400", "dept_code": "0220", "amount": Decimal("3000")},
+        {"account_code": "4900", "dept_code": "0220", "amount": Decimal("-14916")},
+    ]
+    pl = calculate_full_pl(**build_actual_inputs(rows))
+    assert get_line(pl, "OVH_CAFETERIA") == Decimal("0")
     assert abs(get_line(pl, "GOP") - Decimal("99500")) < Decimal("0.01")
 
 

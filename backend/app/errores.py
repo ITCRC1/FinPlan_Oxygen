@@ -253,6 +253,12 @@ MENSAJES: dict[str, dict[str, str]] = {
               "quitarle el rol o desactivarlo, o nadie va a poder administrar.",
         "en": "This is the only active administrator. Appoint another one before "
               "removing the role or deactivating, or nobody will be able to administer."},
+    "reparto.tipo_desconocido": {
+        "es": "Tipo de reparto desconocido: '{tipo}'. Válidos: {validos}",
+        "en": "Unknown allocation type: '{tipo}'. Valid ones: {validos}"},
+    "auth.solo_lectura": {
+        "es": "Tu perfil ({perfil}) es de sólo lectura: podés ver todo, pero no modificar.",
+        "en": "Your profile ({perfil}) is read-only: you can see everything, but not change it."},
     "auth.requiere_admin": {
         "es": "Requiere rol admin",
         "en": "Requires the admin role"},
@@ -367,6 +373,17 @@ MENSAJES: dict[str, dict[str, str]] = {
     "fte.archivo_sin_bloques": {
         "es": "El archivo no trae bloques mensuales de FTE.",
         "en": "The file has no monthly FTE blocks."},
+    # La columna Commentary del P&L Statement (`comentario_pl_api`).
+    "comentario.sin_renglon": {
+        "es": "Falta decir a qué renglón pertenece el comentario",
+        "en": "The comment must say which line it belongs to"},
+    # El desplegable de detalle de una celda (`detalle_celda_api`).
+    "escenario.falta": {
+        "es": "Hay que decir al menos un escenario",
+        "en": "At least one scenario is required"},
+    "clase.desconocida": {
+        "es": "Clase inválida: se espera revenue, cost, payroll, opex o property",
+        "en": "Invalid class: expected revenue, cost, payroll, opex or property"},
     "mes.rango_invalido": {
         "es": "from_month/to_month tienen que estar entre 1 y 12, y from ≤ to",
         "en": "from_month/to_month must be between 1 and 12, with from ≤ to"},

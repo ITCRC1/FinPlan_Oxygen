@@ -285,14 +285,31 @@ async def upsert_laundry_config(scenario_id: str, rows: list[LaundryConfigRow]):
     async with get_session() as session:
         # Una version enllavada no se puede editar.
         await candado(session, scenario_id)
+        # ⚠️ **Una fila sin departamento no se guarda.**
+        #
+        # La pantalla agrega renglones en blanco para que el usuario escriba
+        # encima; si se guarda antes de llenarlo, entraba una fila con
+        # `dept_code = ""`. Esa fila no es de nadie: no cae en ningun grupo del
+        # P&L, no recibe reparto y ensucia el cuadro — y si quedaban DOS en
+        # blanco en el mismo guardado, las dos se insertaban (el `select` no ve
+        # lo pendiente) y el commit reventaba contra `uq_laundry_config`.
+        #
+        # Se descartan acá y se deduplica por departamento, quedandose con la
+        # ultima: es lo que el usuario ve en pantalla.
+        limpias: dict[str, LaundryConfigRow] = {}
         for row in rows:
+            code = (row.dept_code or "").strip()
+            if not code:
+                continue
+            limpias[code] = row
+        for code, row in limpias.items():
             monthly = _norm12(row.kilos_monthly)
             # promedio mensual (legacy / fallback); si no mandan mensual usa el escalar
             hist = Decimal(str(_avg12(monthly, row.kilos_historicos)))
             res = await session.execute(
                 select(LaundryAllocationConfig).where(
                     LaundryAllocationConfig.scenario_id == scenario_id,
-                    LaundryAllocationConfig.dept_code == row.dept_code,
+                    LaundryAllocationConfig.dept_code == code,
                 )
             )
             existing = res.scalar_one_or_none()
@@ -305,7 +322,7 @@ async def upsert_laundry_config(scenario_id: str, rows: list[LaundryConfigRow]):
             else:
                 session.add(LaundryAllocationConfig(
                     scenario_id=scenario_id,
-                    dept_code=row.dept_code,
+                    dept_code=code,
                     dept_name=row.dept_name,
                     kilos_historicos=hist,
                     kilos_monthly=monthly,
@@ -313,7 +330,46 @@ async def upsert_laundry_config(scenario_id: str, rows: list[LaundryConfigRow]):
                     notes=row.notes,
                 ))
         await session.commit()
-    return {"ok": True, "updated": len(rows)}
+    return {"ok": True, "updated": len(limpias),
+            "descartadas": len(rows) - len(limpias)}
+
+
+@router.delete("/allocations/{tipo}/{scenario_id}/config/")
+async def borrar_fila_config(tipo: str, scenario_id: str, dept: str = ""):
+    """Saca UN departamento de la matriz de reparto.
+
+    Owner, 2026-09-03: corrigió el código de Habitaciones de `110` a `0110` y
+    la fila vieja quedó pegada — **la pantalla no tenía forma de borrar**. Los
+    kilos pasaron a sumar 1,70 en vez de 1,00 y el reparto se partió en dos,
+    con Rooms llevándose la mitad de lo que le tocaba. Hubo que sacarla por la
+    base.
+
+    ⚠️ **`dept` viaja como parámetro y no en la ruta.** La fila que hay que
+    borrar es muchas veces la que tiene el departamento VACÍO —un renglón en
+    blanco guardado sin llenar—, y `.../config//` no es una URL: el servidor la
+    normaliza y la fila queda inalcanzable justo en el caso que más importa.
+
+    Borrar acá **no recalcula**: saca la fila de la configuración y deja los
+    asientos como están. El reparto se rehace con «Recalcular», que es una
+    decisión aparte — y así se puede limpiar la matriz sin tocar los números
+    hasta estar conforme.
+    """
+    modelos = {"laundry": LaundryAllocationConfig,
+               "cafeteria": CafeteriaAllocationConfig}
+    Modelo = modelos.get(tipo)
+    if Modelo is None:
+        raise ErrorApi(422, "reparto.tipo_desconocido", tipo=tipo,
+                       validos=sorted(modelos))
+
+    async with get_session() as session:
+        await candado(session, scenario_id)
+        filas = (await session.execute(select(Modelo).where(
+            Modelo.scenario_id == scenario_id,
+            Modelo.dept_code == (dept or "")))).scalars().all()
+        for f in filas:
+            await session.delete(f)
+        await session.commit()
+    return {"ok": True, "borradas": len(filas), "dept": dept}
 
 
 # ─── Lavandería params (kilos uniformes/huéspedes + cuentas) ───────────────────

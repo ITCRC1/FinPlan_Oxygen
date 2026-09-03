@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { getStoredUser, logout, type AuthUser } from "@/lib/api";
+import { esSoloLectura } from "@/lib/perfil";
 import LanguageSwitch from "@/components/LanguageSwitch";
 import { useHotel } from "@/lib/useHotel";
 import { HOTEL_ID } from "@/lib/hotel";
@@ -144,7 +145,6 @@ export const NAV: NavGroup[] = [
       { key: "plByDept", href: "/reports/pl-by-dept" },
       { key: "plByDeptCompare", href: "/reports/pl-by-dept-compare" },
       { key: "plYtd", href: "/reports/pl-ytd" },
-      { key: "plFullExec", href: "/reports/pl-full" },
       { key: "execSummary", href: "/reports/summary" },
       { key: "ytdSummary", href: "/reports/ytd" },
       { key: "operations", header: true },
@@ -166,6 +166,28 @@ export const NAV: NavGroup[] = [
     key: "monthEnd",
     items: [
       { key: "monthEndPL", href: "/month-end/pl" },
+      // Movido desde Reportes (owner, 2026-08-28). La pantalla NO se mueve de
+      // carpeta: sigue en `/reports/pl-full`. Cambiar la ruta romperia los
+      // enlaces que alguien ya tenga guardados —y el `?esc=` que viaja en
+      // ellos— a cambio de nada: el menu es donde se busca, la ruta es donde
+      // vive.
+      { key: "plFullExec", href: "/reports/pl-full" },
+      // COPIA del reporte, con pantalla propia (owner, 2026-08-28: «copia el
+      // reporte», despues de que la primera vuelta fuera solo una segunda
+      // entrada al mismo archivo). El original se queda en Reportes.
+      { key: "monthEndDetailFull", href: "/month-end/pl-detail?ambito=consolidado" },
+      // Los checkbooks, SÓLO PARA CONSULTAR. Owner, 2026-09-03: «favor mueve
+      // el checkbook afuera, donde está Full P&L Ejecutivo».
+      //
+      // ⚠️ Va en el MENÚ y no en un sub-tab del cierre: el que no tiene acceso
+      // a Planning viene justamente a mirar un checkbook, y un sub-tab lo
+      // obliga a entrar al cierre, elegir versiones y saber que está ahí
+      // adentro.
+      { key: "monthEndCheckbooks", href: "/month-end/checkbooks" },
+      // El armado de ingresos de Planning, también SÓLO PARA CONSULTAR
+      // (owner, 2026-09-03). Mismo motivo que los checkbooks: quien no tiene
+      // acceso a Planning igual necesita ver de qué está hecho el ingreso.
+      { key: "monthEndRevenuePlan", href: "/month-end/revenue-plan" },
     ],
   },
   {
@@ -849,6 +871,18 @@ export default function TopNav() {
               {(user.name || user.email).split("@")[0].trim().split(/\s+/)[0]}
               {user.role === "admin" && <span style={{ color: "var(--nav-fg-dim)", marginLeft: 4 }}>· {tc("admin")}</span>}
             </span>
+            {/* El perfil que sólo mira se DICE. Un lector que no sabe que lo es
+                interpreta cada 403 como que la app está rota; con el rótulo
+                delante, entiende. Ver `lib/perfil.ts` y `app/perfiles.py`. */}
+            {esSoloLectura() && (
+              <span title="Tu perfil es de sólo lectura: podés ver todo, pero no modificar"
+                style={{ border: "1px solid var(--border-medium)", borderRadius: 4,
+                         padding: "1px 6px", fontSize: 10.5, letterSpacing: .3,
+                         color: "var(--nav-fg-dim)", textTransform: "uppercase",
+                         whiteSpace: "nowrap" }}>
+                Sólo lectura
+              </span>
+            )}
             <button onClick={() => { logout(); setUser(null); router.push("/login"); }}
               style={{ border: "1px solid var(--border-medium)", borderRadius: 4, padding: "3px 10px", cursor: "pointer",
                 background: "none", color: "var(--nav-fg)", fontSize: 12 }}>

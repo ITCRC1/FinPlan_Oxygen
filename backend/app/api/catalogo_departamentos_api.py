@@ -53,6 +53,7 @@ from app.db import get_db
 from app.errores import ErrorApi
 from app.textos import Idioma, t
 from app.engine import pl_engine
+from app.departamentos import recordar_tres_digitos
 from app.models.department_catalog import DepartmentCatalog
 
 router = APIRouter()
@@ -108,10 +109,16 @@ def _fila(d: DepartmentCatalog) -> dict:
 
 
 async def _todos(db: AsyncSession) -> list[DepartmentCatalog]:
-    return list((await db.execute(
+    filas = list((await db.execute(
         select(DepartmentCatalog).order_by(DepartmentCatalog.display_order,
                                            DepartmentCatalog.dept_code)
     )).scalars())
+    # ⚠️ El catálogo es quien SABE cuáles departamentos son de tres dígitos
+    # (hoy el Club 260, el Área Recreativa 270 y Misceláneos 280). Se lo cuenta
+    # al normalizador de `dept_code`, que si no tuviera esta lista rellenaría a
+    # `0260` un código perfectamente válido — ver `app/departamentos.py`.
+    recordar_tres_digitos(d.dept_code for d in filas)
+    return filas
 
 
 def _validar_grupo(grupo: str | None) -> None:

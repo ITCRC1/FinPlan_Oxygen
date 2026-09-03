@@ -4,10 +4,14 @@ from sqlalchemy import String, Boolean, DateTime, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
+# `viewer` = el perfil de sólo lectura (ver app/perfiles.py); `collaborator` es
+# el «editor» que el owner nombra. Se llama asi desde la Fase 0 y renombrarlo
+# obligaria a migrar todas las filas por un sinonimo.
+#
 # ⚠️ `guillermo_approver` NO hereda los endpoints de admin: `get_current_admin`
 # sigue comparando contra "admin" a secas. Aprobar excepciones de Guillermo usa
 # su propia dependencia, `get_guillermo_approver`. Ver `docs/GUILLERMO.md` §7.
-ROLES = ("admin", "collaborator", "guillermo_approver")
+ROLES = ("admin", "collaborator", "guillermo_approver", "viewer")
 
 
 class User(Base):

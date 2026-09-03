@@ -24,3 +24,6 @@ pytest-asyncio==1.4.0
 httpx==0.28.1
 tzdata==2026.2
 anthropic==1.0.0
+# El generador del Word del cierre. Fijada como el resto: con `>=`
+# cada build resuelve una versión distinta por su cuenta.
+python-docx==1.2.0

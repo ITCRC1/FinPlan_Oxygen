@@ -114,20 +114,77 @@ def test_los_pozos_de_reparto_no_salen_en_el_gasto():
     assert EXCLUIR_DE_GASTO == {"0220", "0161", "0162"}
 
 
-def test_la_exclusion_es_solo_del_gasto_no_del_ingreso():
+def test_el_INGRESO_de_la_lavanderia_no_se_pierde():
     """La primera version cortaba antes de mirar la clase de cuenta y se llevaba
     puesto el INGRESO de la lavanderia: la venta del año bajaba 3,450 sin que
-    nada lo dijera. El filtro tiene que mirar la clase primero."""
+    nada lo dijera.
+
+    ⚠️ Desde el 2026-09-03 los departamentos de reparto ya NO se excluyen del
+    gasto —se cuentan y su credito 49xx los netea, ver
+    `test_el_SOBRANTE_del_reparto_se_cuenta`—, asi que la vieja linea de filtro
+    no existe. Lo que se sigue exigiendo es lo mismo: que un 4xxx que no sea de
+    reparto entre como ingreso.
+    """
     src = io.open(RAIZ / "app" / "api" / "gasto_por_clase_api.py", encoding="utf-8").read()
-    assert 'cuenta[:1] in ("5", "6", "7") and dept in EXCLUIR_DE_GASTO' in src, (
-        "el filtro de pozos de reparto dejo de mirar la clase de cuenta"
-    )
+    assert 'cuenta.startswith("4") and detalle is not None' in src
+    assert "cuenta not in CUENTAS_DE_REPARTO" in src, (
+        "el ingreso dejo de distinguir las cuentas de reparto: o se pierde la "
+        "venta de lavanderia, o el credito de distribucion entra como venta")
+
+
+def test_el_SOBRANTE_del_reparto_se_cuenta():
+    """⚠️ Lo que este cuadro perdia, medido contra el P&L en produccion:
+
+        ACTUAL 2026    may 2.090,32 · jun 4.146,54 · jul 1.121,36
+        BUDGET 2026    entre 1.361 y 1.493, TODOS los meses
+
+    El costo de lavanderia esta en el mayor, pero el departamento se descartaba
+    entero porque «se reparte». Y un ACTUAL no se reparte —se sube como vino—,
+    asi que no habia nada que lo devolviera. El motor no lo descarta: lo que no
+    alcanzo a repartirse queda en overhead (`OH_LAUNDRY`), que es la regla del
+    owner del 2026-08-28.
+
+    La plata que faltaba iba contra el gasto, o sea que el mes se veia MEJOR de
+    lo que fue.
+    """
+    src = io.open(RAIZ / "app" / "api" / "gasto_por_clase_api.py", encoding="utf-8").read()
+    assert "if cuenta in CUENTAS_DE_REPARTO:" in src, (
+        "la rama del mayor dejo de netear con el credito de distribucion")
+    assert "alloc_by_dept" in src, (
+        "la rama del checkbook dejo de sumar los asientos de reparto")
+
+
+def test_un_mes_CERRADO_del_forecast_saca_el_gasto_del_ACTUAL():
+    """⚠️ El tercer descuadre, y el mas grande.
+
+    Este endpoint leia siempre el mayor del PROPIO escenario, y un forecast no
+    tiene mayor: caia siempre al checkbook. En el FORECAST Working 2026 con
+    corte en julio:
+
+        mar/abr/may -> 0 en el cuadro contra 12.189 / 25.851 / 56.027 en el P&L
+        jun/jul     -> 42.658 y 12.370 DE MAS, mostrando lo presupuestado
+                       sobre meses que ya cerraron
+
+    La mezcla es la misma que hace `compute_pl_month`: hasta `actuals_through`
+    manda el ACTUAL enlazado. Rehacerla con otro criterio es como el resumen y
+    el P&L terminan contando dos historias.
+    """
+    src = io.open(RAIZ / "app" / "api" / "gasto_por_clase_api.py", encoding="utf-8").read()
+    assert "linked_actual_scenario" in src
+    assert 'escenario.type == "FORECAST" and m <= (escenario.actuals_through or 0)' in src
 
 
 def test_la_fusion_solo_se_aplica_al_ingreso():
     """En gasto los tres estan excluidos, asi que no hay nada que fusionar: si
     la fusion apareciera ahi, seria señal de que alguien los volvio a mostrar."""
     src = io.open(RAIZ / "app" / "api" / "gasto_por_clase_api.py", encoding="utf-8").read()
-    usos = [l for l in src.splitlines() if "FUSION_INGRESO.get" in l]
-    assert len(usos) == 1, f"la fusion se aplica en {len(usos)} lugares"
-    assert '"revenue"' in usos[0]
+    lineas = src.splitlines()
+    idx = [i for i, l in enumerate(lineas) if "FUSION_INGRESO.get" in l]
+    assert len(idx) == 1, f"la fusion se aplica en {len(idx)} lugares"
+    # Se mira el BLOQUE, no la linea: la fusion dejo de caber en un renglon
+    # cuando el ingreso paso a indexarse por linea (2026-09-02), y fijar el
+    # texto exacto habria hecho fallar esto sin que la regla se moviera.
+    bloque = chr(10).join(lineas[max(0, idx[0] - 6): idx[0] + 3])
+    assert '"revenue"' in bloque, (
+        "la fusion 0161->0162 salio del bloque de INGRESO: si se aplicara al "
+        "gasto, estaria mostrando departamentos que son pozos de reparto")

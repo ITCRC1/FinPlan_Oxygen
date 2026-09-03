@@ -1,4 +1,6 @@
 "use client";
+import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
+  from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
@@ -92,6 +94,7 @@ export default function PayrollCheckbookPage() {
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const t = useTranslations("payrollCb");
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
+  const { cerrado, cerrados } = useMesesCerrados(scenarioId);
   const [scenarios, setScenarios]     = useState<Scenario[]>([]);
   const [depts, setDepts]             = useState<Dept[]>([]);
   const [selectedDept, setSelected]   = useState<string | null>(null);
@@ -473,11 +476,27 @@ export default function PayrollCheckbookPage() {
           <div style={{ marginBottom: 8, fontSize: 13, color: "var(--text-primary)", fontWeight: 600 }}>
             {selectedDeptName}
           </div>
+          {cerrados.length > 0 && (
+            <div style={{
+              padding: "8px 12px", marginBottom: 10, borderRadius: 7,
+              border: "1px solid var(--border)",
+              borderLeft: "4px solid var(--brand)",
+              fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)",
+            }}>
+              🔒 <b>Meses cerrados: {cerrados.map(m => MONTHS[m - 1]).join(", ")}.</b>{" "}
+              Ya tienen actuales cargados, así que se muestran en gris y no se
+              editan. El forecast se trabaja de{" "}
+              <b>{MONTHS[Math.max(...cerrados)] ?? ""}</b> en adelante.
+            </div>
+          )}
           <table className="fin-table">
             <thead>
               <tr>
                 <th style={{ textAlign: "left", width: 140 }}>{tc("concept")}</th>
-                {MONTHS.map(m => <th key={m}>{m}</th>)}
+                {MONTHS.map((m, mi) => (
+                  <th key={m} title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                      style={cerrado(mi + 1) ? CABECERA_CERRADA : undefined}>{m}</th>
+                ))}
                 <th style={{ color: "var(--brand)" }}>{tc("annual")}</th>
               </tr>
             </thead>
@@ -532,7 +551,12 @@ export default function PayrollCheckbookPage() {
                   <th style={{ textAlign: "left", width: 160 }}>{t("position")}</th>
                   <th style={{ textAlign: "left", width: 140 }}>{tc("employee")}</th>
                   <th>{t("salary")}</th>
-                  {MONTHS.map(m => <th key={m}>{m}<br/><span style={{ fontWeight: 400, opacity: 0.6 }}>FTE / SW</span></th>)}
+                  {MONTHS.map((m, mi) => (
+                    <th key={m} title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                        style={cerrado(mi + 1) ? CABECERA_CERRADA : undefined}>
+                      {m}<br/><span style={{ fontWeight: 400, opacity: 0.6 }}>FTE / SW</span>
+                    </th>
+                  ))}
                   <th>{t("annualTotal")}</th>
                   <th style={{ width: 70 }}></th>
                 </tr>
@@ -572,8 +596,14 @@ export default function PayrollCheckbookPage() {
                           <option value="USD">USD</option>
                         </select>
                       </td>
+                      {/* Las celdas de planilla son de SOLO LECTURA —se editan
+                          en la pantalla de conceptos—, asi que aca el gris solo
+                          señala el corte. El candado de verdad esta en el ORM. */}
                       {pos.months.map(mdata => (
-                        <td key={mdata.month} style={{ padding: "4px 8px" }}>
+                        <td key={mdata.month}
+                            title={cerrado(mdata.month) ? TITULO_CERRADO : undefined}
+                            style={{ padding: "4px 8px",
+                                     ...(cerrado(mdata.month) ? CELDA_CERRADA : {}) }}>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                             <span className="mono" style={{ fontSize: 11 }}>{fmtFte(mdata.fte)}</span>
                             <span className="mono" style={{ fontSize: 10, color: "var(--text-secondary)" }}>

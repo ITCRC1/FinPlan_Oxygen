@@ -19,19 +19,48 @@
 - **Estándar contable:** USALI (Uniform System of Accounts for the Lodging Industry)
 - **Sistema contable fuente:** Integrity SDG + QuickBooks
 
-### ⚠️ REGLA PERMANENTE — Departamentos de ALLOCATION (aplica a TODO mes/año/escenario)
-Algunos departamentos no son operativos: su gasto se **reparte (aloca)** a otros vía la
-cuenta **"Distribución"** (4xxx negativa) y NO debe entrar a los totales operativos. La
-regla vive en código: `ALLOCATION_EXCLUDE` en `app/importers/gl_detail_importer.py`
-(la aplican el importador GL y los reportes de planilla/costos/opex), y está blindada por
-`tests/test_gl_allocation.py`. Aplica automáticamente a cada bloque/escenario/mes — NO hay
-paso manual; subir cualquier mes futuro la respeta.
-- **0220 (Employee Dining / comida): allocation TOTAL** → excluir costo(5)/planilla(6)/opex(7). Netea a 0.
-- **0161 (Laundry): SPLIT** → la lavandería interna (planilla 6 + insumos 7) es allocation
-  (netea a 0); el **Laundry Services** que vende afuera es OPERATIVO → su ingreso(4) y
-  costo de venta(5) SE QUEDAN. Excluir solo 6 y 7.
-- La cuenta 4xxx "Distribución" se excluye del revenue (es el crédito de alocación, no ingreso).
-- **Verificado:** con esta regla el profit por categorías = Net del P&L al centavo (Budget y Actual, YTD y Full Year).
+### ⚠️ REGLA — Departamentos de ALLOCATION: el saldo SE VE (owner, 2026-08-28)
+
+Cafetería (`0220`) y Lavandería (`0161`) reparten su gasto a los departamentos
+que usan el servicio, vía el crédito «Distribución» (4900/4901/4999).
+
+**Antes se DESCARTABAN al importar.** `ALLOCATION_EXCLUDE` sacaba sus clases
+5/6/7 en el parser, así que esas filas nunca llegaban a la base. El razonamiento
+era que el reparto las dejaba en cero, así que tirarlas daba lo mismo.
+
+**No daba lo mismo cuando no netean.** Lo que se tiraba entonces no era un
+duplicado: era el SOBRANTE, y desaparecía sin que nada avisara.
+
+Owner, 2026-08-28: *«cafetería y laundry tienen saldo — que salga ese saldo en
+overhead»* · *«si tiene saldo que lo vea como normal y que aparezca esa
+diferencia en overhead; hasta que se deje en 0, no pasa nada»*.
+
+**Ahora no se descarta nada y el neteo lo hace la aritmética.**
+`calculate_full_pl` suma `planilla + costo + opex + reparto` por grupo, y
+`CAFETERIA` y `LAUNDRY_OPS` son grupos de OVERHEAD:
+
+* reparto completo → la línea da **cero** y ni se dibuja (igual que antes);
+* reparto parcial o sin reparto → **el sobrante se ve en overhead**.
+
+**Dos constantes que NO son lo mismo** — confundirlas fue el bug:
+
+| | Qué declara | Hoy |
+|---|---|---|
+| `ALLOCATION_EXCLUDE` | qué filas **no llegan a la base** | `{}` — nada se descarta |
+| `DEPTOS_DE_REPARTO` | **quién reparte**, y en qué clases | `{"0220": {5,6,7}, "0161": {6,7}}` |
+
+De la segunda salen `ALLOC_EXCL_COST/PAYROLL/OPEX`, que el P&L por Departamento
+usa para restarle a cada origen **lo que efectivamente repartió** (corrección
+del 2026-08-27). Vaciarlas haría que el reporte muestre el gasto bruto y lo
+cuente dos veces.
+
+Blindado por `tests/test_gl_allocation.py`, `tests/test_actuals_pl.py` y
+`tests/test_solo_se_excluye_lo_que_se_reparte.py`.
+
+**Cómo se destapó:** subiendo los actuales de 2026, marzo y abril entraron (no
+traían estos departamentos) y mayo, junio y julio rebotaron con **409** — el
+bloque de verificación del archivo incluía el gasto de cafetería y el detalle lo
+había descartado. El archivo tenía razón y el importador no.
 
 ### ⚠️ REGLA PERMANENTE — El SEED manda sobre `account_mapping` y `report_line_config`
 `backend/Procfile` arranca con `alembic upgrade head && python -m app.seed && uvicorn`.
@@ -91,6 +120,38 @@ FinPlan CWL es un sistema de **planificación y análisis financiero hotelero US
 | OPEX | Upload Excel | Entrada en sistema (checkbook por dept) | Entrada en sistema |
 | Planilla | Upload Excel | Entrada en sistema (checkbook por dept) | Entrada en sistema |
 | KPIs | Upload Excel | Entrada en sistema | Entrada en sistema |
+
+---
+
+### ⚠️ REGLA PERMANENTE — Perfiles: quién ve y quién escribe
+
+Owner, 2026-08-26: *«sería por perfil: editor, view, y con vistas limitadas por
+perfil»*. Son **dos capas distintas y no se reemplazan**:
+
+| | dónde | qué hace | qué NO hace |
+|---|---|---|---|
+| **Permiso** | `app/perfiles.py` | el perfil `viewer` recibe **403** en todo `POST/PUT/PATCH/DELETE` | no esconde nada de la pantalla |
+| **Vista** | `tab_enablement` (col. `perfil`) | esconde tabs y reportes de la barra | **no impide el acceso**: la ruta responde si se escribe la URL |
+
+**El permiso se engancha en `_guard`, en `main.py`, y en ningún otro lado.** Es
+el mismo mecanismo del candado del escenario: una ruta nueva queda cubierta sin
+que nadie se acuerde. Un `if user.role == "viewer"` dentro de un endpoint es la
+variante que falla **abierta** — la que se olvide deja escribir.
+
+**La matriz de vistas es esparsa y el default es PRENDIDO.** Sin fila, se ve.
+`perfil = ""` significa «para toda la propiedad», y un usuario ve la **unión**
+de lo apagado para la propiedad más lo apagado para su perfil: **la propiedad
+manda sobre el perfil**.
+
+⚠️ **`""` y `NULL` no son lo mismo.** El centinela es `""` porque en Postgres
+dos `NULL` no chocan en un `UNIQUE`, y la tabla dejaría de tener una fila por
+decisión. Igual de importante en la API: `GET .../tabs/` **sin** `perfil`
+contesta por el rol de quien llama (eso usa la barra), y con `perfil=""`
+contesta la matriz cruda (eso usa `/admin/tabs`). Confundirlas hace que la
+pantalla de administración se edite a sí misma.
+
+Los roles viven en `app/models/user.py::ROLES`. Un rol nuevo **no hereda**
+administración: `get_current_admin` sigue comparando contra `"admin"` a secas.
 
 ---
 

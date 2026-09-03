@@ -56,15 +56,20 @@ export type Rol = "budget" | "forecast" | "actual" | "actualAnterior";
  * de quedar en blanco.
  */
 export const PREFERENCIA: Record<Rol, { type: string; year: number; version?: string }> = {
-  budget:         { type: "BUDGET",   year: 2027, version: "Working" },
+  // 2026-09-03, owner: «siempre de primero ACTUAL, segundo BUDGET 2026 y
+  // después FORECAST 2026; siempre entro y están 2035 y otras versiones».
+  //
+  // Los tres son 2026 porque 2026 es el año en curso del ciclo: el ACTUAL va
+  // por julio, el BUDGET es contra lo que se compara y el FORECAST es lo que
+  // se está trabajando. Los BUDGET Working 2027..2035 existen pero están en
+  // CERO —son andamiaje de `ensure-working`—, así que abrir ahí mostraba un
+  // reporte real y perfectamente vacío.
+  actual:         { type: "ACTUAL",   year: 2026 },
+  budget:         { type: "BUDGET",   year: 2026, version: "Final" },
   forecast:       { type: "FORECAST", year: 2026, version: "Working" },
-  // 2026-08-19, owner: «quiero que esté siempre Budget 2027, Forecast 2026,
-  // Actual 2025, Actual 2024». Los dos ACTUAL RETROCEDEN un año respecto del
-  // 17-ago, y no es un cambio de opinión al azar: el Actual 2026 está a medio
-  // subir (junio no está cargado), así que abría comparando contra un año
-  // incompleto — y un año incompleto no se ve incompleto, se ve malo.
-  actual:         { type: "ACTUAL",   year: 2025 },
-  actualAnterior: { type: "ACTUAL",   year: 2024 },
+  // El año anterior sigue siendo el anterior: es para los reportes que comparan
+  // dos años cerrados, y ahí 2026 contra 2026 no compara nada.
+  actualAnterior: { type: "ACTUAL",   year: 2025 },
 };
 
 /**
@@ -86,8 +91,14 @@ export const PREFERENCIA: Record<Rol, { type: string; year: number; version?: st
  * «borrá las preferencias» de rutina: lo que el owner elija DESPUÉS tiene que
  * quedarse quieto, que es todo el punto de este módulo.
  */
-export const GENERACION = "2026-08-19-actuales-2025-2024";
+export const GENERACION = "2026-09-03-los-tres-de-2026";
 const LLAVE_GEN = "finplan_esc_generacion";
+
+/** Lo que NO se toca al cambiar de generación: la sesión.
+ *
+ *  ⚠️ Sin esta lista, limpiar las preferencias desloguearía al usuario — que
+ *  es una forma muy llamativa de arreglar un selector. */
+const SAGRADAS = new Set(["finplan_token", "finplan_user", LLAVE_GEN]);
 
 /**
  * Descarta las preferencias de una generación anterior. Idempotente y barata:
@@ -100,10 +111,18 @@ export function limpiarSiEsDeOtraGeneracion(): void {
   if (typeof window === "undefined") return;
   try {
     if (localStorage.getItem(LLAVE_GEN) === GENERACION) return;
+    // ⚠️ `finplan_esc_` NO alcanzaba, y por eso el owner seguía viendo 2035
+    // después de que la regla ya decía otra cosa.
+    //
+    // Cierre de Mes guarda sus CUATRO ranuras juntas bajo `finplan.month-end.pl`
+    // —con PUNTOS, no guiones bajos—, así que quedaba fuera de la limpieza y el
+    // id de un Working 2035 elegido una vez sobrevivía a todos los cambios de
+    // regla. Lo guardado le gana al default, en silencio y para siempre.
+    //
+    // Ahora se limpia todo lo que empiece con `finplan`, menos la sesión.
     for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("finplan_esc_") && k !== LLAVE_GEN) localStorage.removeItem(k);
+      if (k.startsWith("finplan") && !SAGRADAS.has(k)) localStorage.removeItem(k);
     }
-    localStorage.removeItem("finplan_planning_scenario");
     localStorage.setItem(LLAVE_GEN, GENERACION);
   } catch {
     /* ver `recordado`: que no se caiga la pantalla por no poder limpiar */
@@ -322,4 +341,35 @@ export function useEscenarioDe<T extends EscenarioMin>(
   }, [pantalla, desdeUrl, fijar]);
 
   return [id, cambiar];
+}
+
+
+/**
+ * Las TRES versiones con las que abre cualquier pantalla que compare: el
+ * ACTUAL, el BUDGET y el FORECAST que manda `PREFERENCIA`.
+ *
+ * Owner, 2026-09-03: *«siempre de primero actual, segundo budget 2026 y después
+ * forecast 2026 … estas mismas versiones quiero que las siembres en todos los
+ * sub tabs, cuando no existan … lo más probable que haga análisis de 3
+ * versiones»*.
+ *
+ * ⚠️ **Existe porque había cuatro copias de esto, y las cuatro estaban mal.**
+ * Cada sub-tab de Cierre de Mes traía su propio
+ * `escenarios.find(s => s.type === tipo)` — «el primero de ese tipo»—, y
+ * `GET /scenarios/` ordena por **año descendente**: el primer BUDGET de la
+ * lista es el Working **2035**. Nada fallaba; cada sub-tab mostraba un
+ * presupuesto real, sólo que uno vacío y de otro año.
+ *
+ * Devuelve ids, y `""` para el papel que no exista — que no es lo mismo que
+ * caer en cualquier otro: una ranura vacía se ve vacía, y un escenario
+ * equivocado se ve como un dato.
+ */
+export function sembrarTres<T extends EscenarioMin>(escenarios: T[]): {
+  actual: string; budget: string; forecast: string;
+} {
+  return {
+    actual: elegir(escenarios, "actual")?.id ?? "",
+    budget: elegir(escenarios, "budget")?.id ?? "",
+    forecast: elegir(escenarios, "forecast")?.id ?? "",
+  };
 }

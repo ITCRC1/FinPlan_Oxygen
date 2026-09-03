@@ -1,4 +1,6 @@
 "use client";
+import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
+  from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
@@ -123,6 +125,7 @@ export default function NonOpCheckbookPage() {
   const tm = useTranslations("months");
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
+  const { cerrado, cerrados } = useMesesCerrados(scenarioId);
   const [scenarios, setScenarios]   = useState<Scenario[]>([]);
   const [rows, setRows]             = useState<Row[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -338,11 +341,30 @@ export default function NonOpCheckbookPage() {
 
       {!loading && !error && (
         <div className="fin-sticky" style={{ overflowX: "auto" }}>
+          {cerrados.length > 0 && (
+            <div style={{
+              padding: "8px 12px", marginBottom: 10, borderRadius: 7,
+              border: "1px solid var(--border)",
+              borderLeft: "4px solid var(--brand)",
+              fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)",
+            }}>
+              🔒 <b>Meses cerrados: {cerrados.map(m => MONTHS[m - 1]).join(", ")}.</b>{" "}
+              Ya tienen actuales cargados, así que se muestran en gris y no se
+              editan. El forecast se trabaja de{" "}
+              <b>{MONTHS[Math.max(...cerrados)] ?? ""}</b> en adelante.
+            </div>
+          )}
           <table className="fin-table" style={{ minWidth: 1440, fontSize: 12 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", width: 300 }}>Detalle</th>
-                {MONTHS.map(m => <th key={m} style={{ textAlign: "right", minWidth: 74 }}>{m}</th>)}
+                {MONTHS.map((m, mi) => (
+                  <th key={m} title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                      style={{ textAlign: "right", minWidth: 74,
+                               ...(cerrado(mi + 1) ? CABECERA_CERRADA : {}) }}>
+                    {m}
+                  </th>
+                ))}
                 <th style={{ textAlign: "right", color: "var(--brand)", minWidth: 88 }}>{tc("annual")}</th>
                 <th style={{ width: 28 }}></th>
               </tr>
@@ -351,6 +373,7 @@ export default function NonOpCheckbookPage() {
               {SECTIONS.map(sec => (
                 <SectionBlock
                   key={sec.title}
+                  cerrado={cerrado}
                   sec={sec}
                   rows={rows}
                   lineMonth={lineMonth}
@@ -387,6 +410,7 @@ export default function NonOpCheckbookPage() {
 
 function SectionBlock({
   sec, rows, lineMonth, lineAnnual, onAdd, onDelete, onSetMonth, onSetDesc,
+  cerrado,
 }: {
   sec: Section;
   rows: Row[];
@@ -396,6 +420,8 @@ function SectionBlock({
   onDelete: (key: string) => void;
   onSetMonth: (key: string, mk: string, v: string) => void;
   onSetDesc: (key: string, v: string) => void;
+  /** ¿Este mes (1..12) ya tiene actuales? Lo decide el backend. */
+  cerrado: (mes: number) => boolean;
 }) {
   const subMonth = MONTH_KEYS.map(mk => sec.lines.reduce((s, l) => s + lineMonth(l.code, mk), 0));
   const subAnnual = subMonth.reduce((a, b) => a + b, 0);
@@ -417,6 +443,7 @@ function SectionBlock({
           lineRows={rows.filter(r => r.report_line_code === line.code)}
           lineMonth={lineMonth}
           lineAnnual={lineAnnual}
+          cerrado={cerrado}
           onAdd={onAdd}
           onDelete={onDelete}
           onSetMonth={onSetMonth}
@@ -446,6 +473,7 @@ function SectionBlock({
 
 function LineBlock({
   line, lineRows, lineMonth, lineAnnual, onAdd, onDelete, onSetMonth, onSetDesc,
+  cerrado,
 }: {
   line: LineDef;
   lineRows: Row[];
@@ -455,6 +483,8 @@ function LineBlock({
   onDelete: (key: string) => void;
   onSetMonth: (key: string, mk: string, v: string) => void;
   onSetDesc: (key: string, v: string) => void;
+  /** ¿Este mes (1..12) ya tiene actuales? Lo decide el backend. */
+  cerrado: (mes: number) => boolean;
 }) {
   const t = useTranslations("nonop");
   const tc = useTranslations("common");
@@ -514,13 +544,21 @@ function LineBlock({
                 style={{ width: 230, fontSize: 11 }}
               />
             </td>
-            {MONTH_KEYS.map(mk => (
-              <td key={mk} className="mono" style={{ textAlign: "right", padding: "2px 6px" }}>
+            {MONTH_KEYS.map((mk, mi) => (
+              <td key={mk} className="mono"
+                  title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}
+                  style={{ textAlign: "right", padding: "2px 6px",
+                           ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}>
+                {/* ⚠️ `readOnly` y no `disabled`: un input deshabilitado no deja
+                    seleccionar ni copiar el numero, y un mes cerrado se sigue
+                    consultando. */}
                 <input
                   value={r.months[mk]}
+                  readOnly={cerrado(mi + 1)}
                   onChange={e => onSetMonth(r.key, mk, e.target.value)}
                   className="fin-input"
-                  style={{ width: 66, textAlign: "right" }}
+                  style={{ width: 66, textAlign: "right",
+                           ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}
                 />
               </td>
             ))}

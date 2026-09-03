@@ -1724,7 +1724,44 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     scenario = await session.get(Scenario, scenario_id)
     if scenario is None:
         raise ValueError(f"Scenario {scenario_id} not found")
-    scenario.assert_editable()
+
+    # ── Un escenario con candado: se PROYECTA, no se recalcula ────────────────
+    #
+    # Owner, 2026-09-03: *«recalculá todas las versiones en budget 2026 final;
+    # veo que hay unos tabs que no tienen datos como si fuera 0, cosa que no es
+    # real»*.
+    #
+    # ⚠️ La distinción es entre un DATO y un CACHÉ, y es la razón de que esto no
+    # sea aflojar el candado.
+    #
+    # `pl_lines` no es algo que alguien escribió: es el resultado de una cuenta
+    # sobre los datos del escenario, guardado para no rehacerlo en cada consulta
+    # —el tab de P&L lo calcula al vuelo y no lo mira—. Bloquear su escritura no
+    # protegía ningún número: dejaba a los reportes que SÍ lo leen —Resumen 12m,
+    # Consulta, Cuadre— mostrando cero. Y un cero se lee como un dato, no como
+    # un dato que falta: en producción, el BUDGET Final 2026 tenía 0 filas
+    # contra 1.369 del Working, con **exactamente el mismo** P&L.
+    #
+    # Lo que sí sigue bloqueado es todo lo demás: planilla, repartos y monedas
+    # son datos del escenario, y recalcularlos sobre algo cerrado cambiaría un
+    # entregable ya aprobado. Por eso acá se sale ANTES de esa rama.
+    if scenario.is_locked:
+        pl_lines = await _persist_pl(session, scenario, None)
+        scenario.last_recalc_at = datetime.utcnow()
+        await session.commit()
+        return {
+            "scenario_id": scenario_id,
+            "payroll_entries_updated": 0,
+            "allocation_entries": 0,
+            "pl_lines": pl_lines,
+            "avisos": [
+                "El escenario está cerrado con candado: sólo se volvió a "
+                "escribir el P&L guardado, que es el resultado de la cuenta y "
+                "no un dato. La planilla, los repartos y las monedas no se "
+                "tocaron.",
+            ],
+            "status": "recalculated",
+        }
 
     # Escenarios cuyo número SE SUBIÓ: no se recalcula planilla, ni repartos, ni
     # monedas, ni ingresos — solo se proyecta a `pl_lines` lo que ya está

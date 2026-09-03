@@ -32,10 +32,15 @@ ingreso, dos de las tres se quedan viejas y ninguna avisa.
 
 ## De dónde sale cada número
 
-De `pl_lines` — las mismas filas que lee el tab de P&L y el reporte a la Junta.
-No se recalcula nada acá: si el motor cambia una fórmula, los tres reportes
-cambian con él. Un reporte que recalcula por su cuenta es un segundo motor que
-hay que mantener, y el día que discrepan nadie sabe cuál creer.
+Del MISMO motor que Cierre de Mes, el P&L y la Junta: `_monthly_results`. No se
+recalcula nada acá — un reporte que calcula por su cuenta es un segundo motor
+que hay que mantener, y el día que discrepan nadie sabe cuál creer.
+
+⚠️ **Antes leía la tabla `pl_lines`, y era un defecto.** Esa tabla es una FOTO:
+sólo existe si alguien apretó «Recalcular». Con los actuales de 2026 —el mayor
+cargado, 115 filas de marzo a julio— estos tres reportes salían en CERO porque
+el escenario nunca se había recalculado. El dato estaba y el reporte decía que
+no había nada, que es peor que un error: un cero se lee como una respuesta.
 
 ## El bloque de control, al pie
 
@@ -54,7 +59,6 @@ from app.auth import get_current_user
 from app.db import get_session
 from app.errores import ErrorApi
 from app.models.club_membership_stat import ClubMembershipStat
-from app.models.pl_line import PLLine
 from app.models.scenario import Scenario
 from app.models.scenario_stat import ScenarioStat
 
@@ -122,12 +126,27 @@ CONSOLIDADO: list[tuple] = [
     ("tot", "OPERATING PROFIT", ["OPERATING_PROFIT"]),
     ("esp", "", []),
     ("sec", "OVERHEAD EXPENSES", []),
-    ("det", "Administrations", ["OH_ADMIN"]),
-    ("det", "Sales & Marketing", ["OH_SALES_MARKETING"]),
-    ("det", "Maintenance", ["OH_MAINTENANCE"]),
-    ("det", "Information System", ["OH_INFORMATION_SYSTEM"]),
-    ("det", "Utilities", ["OH_UTILITIES"]),
-    ("det", "Area Recreativa", ["OH_AREC"]),
+    # ⚠️ Cada renglón suma `OH_` **y** `COH_`. El overhead tiene costo de ventas
+    # propio y vive en su propio código: en julio 2026, Sistemas daba 5.019,44
+    # por `OH_` y el libro del owner decía 5.956,77 — los 937,33 que faltaban
+    # eran `COH_INFORMATION_SYSTEM`. Como el TOTAL sí los incluía, los renglones
+    # no sumaban su propio total y nada lo avisaba.
+    ("det", "Administrations", ["OH_ADMIN", "COH_ADMIN"]),
+    ("det", "Sales & Marketing", ["OH_SALES_MARKETING", "COH_SALES_MARKETING"]),
+    ("det", "Maintenance", ["OH_MAINTENANCE", "COH_MAINTENANCE"]),
+    ("det", "Information System", ["OH_INFORMATION_SYSTEM",
+                                   "COH_INFORMATION_SYSTEM"]),
+    ("det", "Utilities", ["OH_UTILITIES", "COH_UTILITIES"]),
+    ("det", "Claro Huerta", ["OH_CLARO_HUERTA", "COH_CLARO_HUERTA"]),
+    # Los dos departamentos de REPARTO. Su renglón es el SOBRANTE que no
+    # alcanzó a repartirse (owner, 2026-08-28: «si tiene saldo que aparezca esa
+    # diferencia en overhead»). Faltaban en la plantilla, así que en julio 2026
+    # los 1.121,36 de lavandería estaban dentro del total y en NINGÚN renglón.
+    ("det", "Cafeteria", ["OH_CAFETERIA", "COH_CAFETERIA"]),
+    ("det", "Laundry", ["OH_LAUNDRY", "COH_LAUNDRY"]),
+    ("det", "Employee Benefits", ["OH_EMPLOYEE_BENEFITS",
+                                  "COH_EMPLOYEE_BENEFITS"]),
+    ("det", "Area Recreativa", ["OH_AREC", "COH_AREC"]),
     ("esp", "", []),
     ("tot", "TOTAL OVERHEAD EXPENSES", ["TOTAL_OVERHEAD"]),
     ("esp", "", []),
@@ -426,13 +445,30 @@ async def _clases_de(s, scenario_id: str) -> dict:
 
 
 async def _serie_por_codigo(s, scenario_id: str) -> dict[str, list[float]]:
-    """Los doce meses de cada línea del P&L de un escenario."""
+    """Los doce meses de cada línea del P&L, CALCULADOS — no leídos de la tabla.
+
+    ⚠️ **Antes esto leía `pl_lines`, y era un defecto.** El resto de la app
+    —Cierre de Mes, el P&L, la Junta— calcula al vuelo con `_monthly_results`;
+    `pl_lines` es una foto que sólo existe si alguien apretó «Recalcular».
+
+    Se vio con los actuales de 2026: el mayor estaba cargado (115 filas, marzo a
+    julio) y estos tres reportes salían en CERO, porque el escenario nunca se
+    había recalculado. El dato estaba y el reporte decía que no había nada —
+    peor que un error, porque un cero se lee como una respuesta.
+
+    Ahora sale del mismo lugar que todo lo demás. Cuesta una pasada del motor
+    por versión, que es exactamente lo que ya paga la pantalla de Cierre de Mes.
+    """
+    from app.api.pl_api import _monthly_results
+
+    escenario = await s.get(Scenario, scenario_id)
     out: dict[str, list[float]] = {}
-    for ln in (await s.execute(select(PLLine).where(
-            PLLine.scenario_id == scenario_id))).scalars().all():
-        if 1 <= ln.month <= 12:
-            out.setdefault(ln.line_code, [0.0] * 12)[ln.month - 1] += float(
-                ln.amount_usd or 0)
+    for m in await _monthly_results(s, escenario):
+        i = m["month"] - 1
+        if not 0 <= i <= 11:
+            continue
+        for ln in m["lines"]:
+            out.setdefault(ln.line_code, [0.0] * 12)[i] += float(ln.amount_usd or 0)
     return out
 
 

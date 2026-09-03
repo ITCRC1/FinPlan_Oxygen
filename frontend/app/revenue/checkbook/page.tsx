@@ -1,4 +1,6 @@
 "use client";
+import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
+  from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
@@ -76,6 +78,7 @@ export default function RevenueCheckbookPage() {
   const t = useTranslations("revCheckbook");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
+  const { cerrado, cerrados } = useMesesCerrados(scenarioId);
   const [rows, setRows] = useState<RevenueCheckbookRow[]>([]);
   const [stats, setStats] = useState<RoomStats | null>(null);
   const [source, setSource] = useState<RevenueSource>("drivers");
@@ -485,6 +488,19 @@ export default function RevenueCheckbookPage() {
           const yr: React.CSSProperties = { textAlign: "right", borderLeft: "1px solid var(--border)", fontWeight: 600 };
           return (
             <div className="fin-sticky" style={{ overflowX: "auto", marginBottom: 16 }}>
+          {cerrados.length > 0 && (
+            <div style={{
+              padding: "8px 12px", marginBottom: 10, borderRadius: 7,
+              border: "1px solid var(--border)",
+              borderLeft: "4px solid var(--brand)",
+              fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)",
+            }}>
+              🔒 <b>Meses cerrados: {cerrados.map(m => MONTHS[m - 1]).join(", ")}.</b>{" "}
+              Ya tienen actuales cargados, así que se muestran en gris y no se
+              editan. El forecast se trabaja de{" "}
+              <b>{MONTHS[Math.max(...cerrados)] ?? ""}</b> en adelante.
+            </div>
+          )}
               <table className="fin-table" style={{ minWidth: 1200 }}>
                 <thead>
                   <tr>
@@ -549,15 +565,24 @@ export default function RevenueCheckbookPage() {
                     {r.label}
                   </td>
                   {MONTH_KEYS.map((mk, mi) => (
-                    <td key={mk} style={{ padding: "1px 2px" }}>
+                    <td key={mk} style={{ padding: "1px 2px" }}
+                        title={cerrado(mi + 1) ? TITULO_CERRADO : undefined}>
+                      {/* ⚠️ `readOnly` y no `disabled`: un input deshabilitado no
+                          deja seleccionar ni copiar, y un mes cerrado se sigue
+                          consultando. El pegado tambien se corta: un paste que
+                          arranca en un mes abierto podria desbordar sobre uno
+                          cerrado y perderse entero al guardar. */}
                       <input
                         className="fin-input mono"
                         value={r[mk]}
                         disabled={sel?.is_locked}
+                        readOnly={cerrado(mi + 1)}
                         onChange={e => setCell(ri, mk, e.target.value)}
-                        onPaste={e => handlePaste(ri, mi, e)}
+                        onPaste={e => { if (cerrado(mi + 1)) { e.preventDefault(); return; }
+                                        handlePaste(ri, mi, e); }}
                         onFocus={e => e.target.select()}
-                        style={{ width: "100%", textAlign: "right", padding: "3px 4px" }}
+                        style={{ width: "100%", textAlign: "right", padding: "3px 4px",
+                                 ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}
                       />
                     </td>
                   ))}
