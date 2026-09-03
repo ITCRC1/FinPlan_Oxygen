@@ -528,6 +528,94 @@ async def chequeo(_=Depends(get_current_user), idioma: str = Idioma):
                                error=type(e).__name__)))
 
         # ── 8. El dato de negocio, informativo ───────────────────────────────
+
+        # ── Configuración pendiente ────────────────────────────────────────
+        #
+        # Owner, 2026-09-03: *«guardá esos pendientes en Oxígeno, cuando entre
+        # directo me salgan»*.
+        #
+        # ⚠️ **Se calcula contra la base, no se escribe una lista.** Una lista
+        # de pendientes envejece: se arregla el punto, nadie la actualiza, y la
+        # pantalla sigue pidiendo algo que ya está hecho. Preguntando cada vez,
+        # el punto desaparece solo el día que se cierra — y aparece solo si
+        # alguien lo desconfigura de nuevo.
+        #
+        # Ninguno de estos da error ni descuadra un total, así que **no salen
+        # por ningún otro lado**. Ese es justamente el motivo de juntarlos acá.
+        faltas: list[str] = []
+
+        # 1. El tipo de cambio, si salta entre años.
+        tcs = (await s.execute(text(
+            "select sc.year, min(e.tc_crc_usd), max(e.tc_crc_usd) "
+            "from exchange_rates e join scenarios sc on sc.id = e.scenario_id "
+            "group by 1 order by 1"))).all()
+        distintos = sorted({(a, str(mn)) for a, mn, _mx in tcs})
+        valores = sorted({v for _a, v in distintos})
+        if len(valores) > 1:
+            #: El salto se reporta entre el último año de un valor y el primero
+            #: del siguiente: decir «hay dos tipos de cambio» no ubica dónde.
+            corte = None
+            for i in range(1, len(distintos)):
+                if distintos[i][1] != distintos[i - 1][1]:
+                    corte = (distintos[i - 1], distintos[i])
+                    break
+            if corte:
+                faltas.append(t(idioma, "chequeo.config_tc",
+                                de=corte[0][1], a=corte[1][1],
+                                anio_de=corte[0][0], anio_a=corte[1][0]))
+
+        # 2. Vistas apagadas para TODOS (`perfil` vacío = para todo el mundo).
+        escondidas = [r[0] for r in (await s.execute(text(
+            "select clave from tab_enablement where visible = false "
+            "and coalesce(perfil, '') = '' order by clave"))).all()]
+        if escondidas:
+            faltas.append(t(idioma, "chequeo.config_vistas",
+                            n=len(escondidas),
+                            lista=", ".join(escondidas[:6])))
+
+        # 3. Nadie con perfil de sólo lectura: la capa de vistas por perfil no
+        #    tiene a quién aplicarse.
+        cols_u = {c[0] for c in (await s.execute(text(
+            "select column_name from information_schema.columns "
+            "where table_name = 'users'"))).all()}
+        campo = "perfil" if "perfil" in cols_u else (
+            "role" if "role" in cols_u else None)
+        if campo:
+            lectores = (await s.execute(text(
+                "select count(*) from users where lower(%s) in "
+                "('viewer', 'lector', 'read_only')" % campo))).scalar()
+            if not lectores:
+                faltas.append(t(idioma, "chequeo.config_viewer"))
+
+        # 4. Parámetros que existen para unos escenarios y no para otros.
+        n_esc = (await s.execute(text("select count(*) from scenarios"))).scalar()
+        for tabla in ("payroll_params", "laundry_params"):
+            if await _cuanto_hay(s, tabla) is None:
+                continue
+            con = (await s.execute(text(
+                "select count(distinct scenario_id) from %s" % tabla))).scalar()
+            if con and n_esc and con < n_esc:
+                faltas.append(t(idioma, "chequeo.config_params",
+                                tabla=tabla, n=n_esc - con))
+
+        # 5. Sin actuales, el forecast es proyección pura.
+        if not (await _cuenta(s, "actual_entries") or 0):
+            faltas.append(t(idioma, "chequeo.config_actuales"))
+
+        titulo_config = t(idioma, "chequeo.config_titulo")
+        if faltas:
+            checks.append(_r(
+                "configuracion", titulo_config, "aviso",
+                t(idioma, "chequeo.config_hay", n=len(faltas),
+                  detalle="; ".join(faltas)),
+                t(idioma, "chequeo.config_porque"),
+                t(idioma, "chequeo.config_que_hacer")))
+        else:
+            checks.append(_r(
+                "configuracion", titulo_config, "ok",
+                t(idioma, "chequeo.config_ok"),
+                t(idioma, "chequeo.config_porque")))
+
         negocio = {}
         for tabla in DEL_NEGOCIO:
             n = await _cuenta(s, tabla)

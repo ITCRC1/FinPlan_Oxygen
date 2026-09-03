@@ -393,6 +393,36 @@ TEXTOS: dict[str, dict[str, str]] = {
     "chequeo.negocio_porque": {
         "es": "En una propiedad recién abierta tiene que dar CERO. En una restaurada desde otra instalación, decenas de miles. Si esperabas cero y no da cero, algo se restauró de más.",
         "en": "In a property that has just opened it has to come to ZERO. In one restored from another installation, tens of thousands. If you expected zero and it does not come to zero, something extra was restored."},
+    "chequeo.config_titulo": {
+        "es": "Configuración pendiente",
+        "en": "Pending configuration"},
+    "chequeo.config_ok": {
+        "es": "Nada pendiente: tipo de cambio parejo, vistas visibles, perfiles y parámetros completos.",
+        "en": "Nothing pending: exchange rate consistent, views visible, profiles and parameters complete."},
+    "chequeo.config_hay": {
+        "es": "{n} punto(s) de configuración sin cerrar: {detalle}",
+        "en": "{n} configuration item(s) still open: {detalle}"},
+    "chequeo.config_porque": {
+        "es": "Ninguno da error ni descuadra un total, así que no aparecen por ningún otro lado. Se calculan contra la base cada vez que se abre esta pantalla: cuando se arreglan, desaparecen solos.",
+        "en": "None of these raise an error or unbalance a total, so they show up nowhere else. They are computed against the database each time this screen opens: once fixed, they disappear on their own."},
+    "chequeo.config_que_hacer": {
+        "es": "Cada punto dice dónde se arregla. Los de tipo de cambio y parámetros son por escenario; las vistas y los perfiles, en Administración.",
+        "en": "Each item says where it is fixed. Exchange rate and parameters are per scenario; views and profiles, under Administration."},
+    "chequeo.config_tc": {
+        "es": "el tipo de cambio salta de {de} a {a} entre {anio_de} y {anio_a}",
+        "en": "the exchange rate jumps from {de} to {a} between {anio_de} and {anio_a}"},
+    "chequeo.config_vistas": {
+        "es": "{n} vista(s) escondidas para todos ({lista})",
+        "en": "{n} view(s) hidden for everyone ({lista})"},
+    "chequeo.config_viewer": {
+        "es": "ningún usuario tiene perfil de sólo lectura",
+        "en": "no user has a read-only profile"},
+    "chequeo.config_params": {
+        "es": "{tabla} falta en {n} escenario(s)",
+        "en": "{tabla} missing in {n} scenario(s)"},
+    "chequeo.config_actuales": {
+        "es": "no hay actuales cargados, así que el forecast no mezcla real con proyección",
+        "en": "no actuals loaded, so the forecast does not blend actual with projection"},
     "chequeo.negocio_titulo": {
         "es": "El dato de negocio",
         "en": "The business data"},
