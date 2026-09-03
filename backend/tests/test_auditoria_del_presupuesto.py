@@ -92,3 +92,18 @@ def test_le_pregunta_al_MISMO_resolvedor_que_usa_el_pl():
     fuente = inspect.getsource(api._sin_regla_propia)
     assert "construir_resolvedor" in fuente
     assert '"FALLBACK"' in fuente
+
+
+def test_cuenta_tambien_los_DROP_no_solo_los_descartes():
+    """⚠️ Son dos formas distintas de perderse, y la segunda es peor.
+
+    `FALLBACK` manda la plata al renglón equivocado; `DROP` —la cuenta no está
+    en el mapeo para NINGÚN departamento— hace que no llegue a ninguno.
+
+    Se encontró probando la función contra producción con una cuenta inventada
+    (`7999`): no salía marcada. El primer diagnóstico fue «el aviso no dispara»,
+    y era al revés — el caso de prueba estaba mal, porque `7999` da `DROP` y no
+    `FALLBACK`. Pero destapó que los `DROP` no se estaban contando.
+    """
+    fuente = inspect.getsource(api._sin_regla_propia)
+    assert '"DROP"' in fuente

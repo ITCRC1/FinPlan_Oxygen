@@ -222,9 +222,14 @@ async def _sin_regla_propia(session, detalle) -> list[tuple[str, str, str, float
         if not cuenta:
             continue
         m, como = resolver(dept, cuenta)
-        if como != "FALLBACK":
+        # ⚠️ `DROP` también, no sólo `FALLBACK`. Son dos formas de perderse:
+        # el descarte manda la plata al renglón equivocado, y el DROP —cuando
+        # la cuenta no existe en el mapeo para NINGÚN departamento— hace que no
+        # llegue a ninguno. La segunda es peor y era la que faltaba contar.
+        if como not in ("FALLBACK", "DROP"):
             continue
-        k = (dept, cuenta, (m or {}).get("report_line_code") or "")
+        k = (dept, cuenta,
+             (m or {}).get("report_line_code") or "(ningún renglón)")
         por_par[k] = por_par.get(k, 0.0) + float(r.get("monto") or 0)
     return [(d, c, lc, v) for (d, c, lc), v in
             sorted(por_par.items(), key=lambda x: -abs(x[1]))]
@@ -637,8 +642,8 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
                 for d, c, lc, v in por_descarte[:5])
             avisos.append(
                 f"{len(por_descarte)} combinación(es) de departamento y cuenta "
-                f"no tienen regla propia en el mapeo y llegaron a su renglón "
-                f"POR DESCARTE: {detalles}. Ningún total cambia por esto, así "
+                f"no tienen regla propia en el mapeo y se resolvieron POR "
+                f"DESCARTE: {detalles}. Ningún total cambia por esto, así "
                 f"que no da error en ningún otro lado — pero la plata está en "
                 f"el departamento equivocado.")
 
