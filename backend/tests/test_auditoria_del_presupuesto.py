@@ -65,3 +65,30 @@ def test_se_dice_que_el_detalle_no_viene_del_mayor():
     planeó. Mostrarlo sin aclararlo lo haría pasar por contabilidad."""
     fuente = inspect.getsource(api.auditoria_del_mes)
     assert "no del mayor" in fuente
+
+
+def test_avisa_cuando_una_fila_llega_por_descarte():
+    """⚠️ Lo que se escondió una vez se esconde otra si nadie mira.
+
+    En el BUDGET 2027, `0150`/`7310` —el reparto de lavandería a Tour
+    Activities— no tenía regla en `account_mapping`. El resolvedor cae a una
+    regla genérica, y ese descarte terminaba en OPEX_ROOMS: 1.361,29 al año de
+    gasto de Tours cargados a Habitaciones.
+
+    **No daba error y el GOP cuadraba igual**, porque reclasificar entre dos
+    renglones no mueve ningún total. Apareció sólo porque la auditoría cruzó
+    el detalle contra el motor.
+    """
+    fuente = inspect.getsource(api.auditoria_del_mes)
+    assert "_sin_regla_propia" in fuente, (
+        "se quitó el aviso de descarte: el próximo mapeo que falte va a mover "
+        "plata de departamento sin que nada lo diga")
+
+
+def test_le_pregunta_al_MISMO_resolvedor_que_usa_el_pl():
+    """Mirar si la fila existe en la tabla no alcanza: el orden de precedencia
+    —exacta, padre, sin-departamento, descarte— es lo que decide de verdad
+    adónde va la plata, y sólo el resolvedor lo sabe."""
+    fuente = inspect.getsource(api._sin_regla_propia)
+    assert "construir_resolvedor" in fuente
+    assert '"FALLBACK"' in fuente

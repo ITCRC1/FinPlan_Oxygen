@@ -38,11 +38,11 @@ from app.models import Account, PayrollAccount, Scenario, ExchangeRate  # noqa
 # Salieron el 2026-08-21.
 
 # Identidad del hotel de ESTA instalación. Sale del entorno; el default es
-# Amarena porque este repositorio es el despliegue de Amarena — ver
-# `app/hotel_actual.py`, que explica por qué NO es Corcovado.
-HOTEL_ID = os.getenv("HOTEL_ID", "AMA")
-HOTEL_NAME = os.getenv("HOTEL_NAME", "Amarena Canvas Beach Hotel")
-HOTEL_SHORT = os.getenv("HOTEL_SHORT_NAME", "Amarena")
+# Oxygen porque este repositorio es el despliegue de Oxygen — ver
+# `app/hotel_actual.py`, que explica por qué NO es el hotel de al lado.
+HOTEL_ID = os.getenv("HOTEL_ID", "OXI")
+HOTEL_NAME = os.getenv("HOTEL_NAME", "Oxygen Jungle Villas")
+HOTEL_SHORT = os.getenv("HOTEL_SHORT_NAME", "Oxygen")
 # ⚠️ Default 0, no 30. Un número plausible pero ajeno —las 30 de Corcovado— se
 # ve perfectamente normal y está mal: se arrastra a RevPAR, a ocupación y al P&L
 # sin que nada dé error. En 0 se nota que falta. La verdad se carga en

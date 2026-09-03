@@ -178,6 +178,57 @@ class _AsientoDeCheckbook:
             raise AttributeError(nombre) from None
 
 
+
+async def _sin_regla_propia(session, detalle) -> list[tuple[str, str, str, float]]:
+    """Las filas que llegaron a su renglón POR DESCARTE, no por una regla.
+
+    ## Por qué existe
+
+    El 2026-09-03, en el BUDGET 2027 de Oxygen, el reparto de lavandería a
+    Tour Activities (`0150` / `7310`) no tenía regla en `account_mapping`. El
+    resolvedor cae a una regla genérica cuando no encuentra la del
+    departamento, y ese descarte terminaba en **OPEX_ROOMS**: 1.361,29 al año
+    de gasto de Tours sumados a Habitaciones.
+
+    **No daba error, y el GOP cuadraba igual** —es una reclasificación entre
+    dos renglones, así que ningún total se mueve—. Apareció sólo porque la
+    auditoría cruzó el detalle contra el motor y los dos renglones
+    descuadraron por el mismo monto con signos opuestos.
+
+    Un descarte silencioso en un libro contable es peor que un error: se lee
+    como un dato. Acá se cuenta y se avisa, así el próximo se ve el mismo día
+    en vez de a los meses.
+
+    ⚠️ Se reusa `construir_resolvedor`, que es el que usa el P&L. Preguntarle
+    a él —en vez de mirar si existe la fila— es lo que hace que esto diga la
+    verdad: contesta con el MISMO orden de precedencia (exacta, padre,
+    sin-departamento, descarte) que decide de verdad adónde va la plata.
+    """
+    filas = [
+        {"account_code": r[0], "dept_code": r[1], "report_line_code": r[2],
+         "active_status": r[3], "rollup_operator": r[4]}
+        for r in (await session.execute(select(
+            AccountMapping.account_code, AccountMapping.dept_code,
+            AccountMapping.report_line_code, AccountMapping.active_status,
+            AccountMapping.rollup_operator))).all()
+    ]
+    resolver = pl_engine.construir_resolvedor(filas)
+    por_par: dict[tuple[str, str, str], float] = {}
+    for r in detalle:
+        if not r.get("movimiento") or not r.get("monto"):
+            continue
+        dept = str(r.get("dept_code") or "")
+        cuenta = str(r.get("account_code") or "")
+        if not cuenta:
+            continue
+        m, como = resolver(dept, cuenta)
+        if como != "FALLBACK":
+            continue
+        k = (dept, cuenta, (m or {}).get("report_line_code") or "")
+        por_par[k] = por_par.get(k, 0.0) + float(r.get("monto") or 0)
+    return [(d, c, lc, v) for (d, c, lc), v in
+            sorted(por_par.items(), key=lambda x: -abs(x[1]))]
+
 async def _asientos_del_checkbook(session, escenario) -> list:
     """El detalle por cuenta de una version SIN mayor: sale de los checkbooks.
 
@@ -579,6 +630,18 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         # ⚠️ Sólo las que TIENEN movimiento. Una opción del catálogo en cero
         # que no cae en ninguna línea no es plata perdida: es una opción que no
         # se usó. Contarla acá inventaría un problema.
+        por_descarte = await _sin_regla_propia(session, detalle)
+        if por_descarte:
+            detalles = "; ".join(
+                "depto %s cuenta %s -> %s (%s)" % (d, c, lc, round(v, 2))
+                for d, c, lc, v in por_descarte[:5])
+            avisos.append(
+                f"{len(por_descarte)} combinación(es) de departamento y cuenta "
+                f"no tienen regla propia en el mapeo y llegaron a su renglón "
+                f"POR DESCARTE: {detalles}. Ningún total cambia por esto, así "
+                f"que no da error en ningún otro lado — pero la plata está en "
+                f"el departamento equivocado.")
+
         huerfanos = [r for r in detalle if not r["linea"] and r["movimiento"]]
         if huerfanos:
             avisos.append(

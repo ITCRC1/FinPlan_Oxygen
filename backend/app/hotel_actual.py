@@ -37,7 +37,7 @@ import os
 # ID del hotel de esta instalación. Se lee UNA vez al importar: cambiarlo en
 # caliente no tendría sentido —sería cambiar de hotel a mitad de un request— y
 # leerlo por llamada solo escondería el error.
-HOTEL_ID: str = os.getenv("HOTEL_ID", "AMA")
+HOTEL_ID: str = os.getenv("HOTEL_ID", "OXI")
 
 
 def hotel_id() -> str:
@@ -53,10 +53,10 @@ def hotel_id() -> str:
 # coinciden. **Si el owner renombra la propiedad desde la pantalla, el
 # encabezado de estos Excel sigue el valor del entorno hasta que se actualice la
 # variable** — queda anotado en `docs/PLAN_TRABAJO_AUTONOMO.md`.
-HOTEL_NAME: str = os.getenv("HOTEL_NAME", "Amarena Canvas Beach Hotel")
-# Cae a «Amarena» y no a `HOTEL_ID`, para que las descargas salgan
-# `Planilla_Amarena.xlsx` y no `Planilla_AMA.xlsx`. Mismo default que `seed.py`.
-HOTEL_SHORT: str = os.getenv("HOTEL_SHORT_NAME", "Amarena")
+HOTEL_NAME: str = os.getenv("HOTEL_NAME", "Oxygen Jungle Villas")
+# Cae a «Oxygen» y no a `HOTEL_ID`, para que las descargas salgan
+# `Planilla_Oxygen.xlsx` y no `Planilla_OXI.xlsx`. Mismo default que `seed.py`.
+HOTEL_SHORT: str = os.getenv("HOTEL_SHORT_NAME", "Oxygen")
 
 
 def hotel_slug() -> str:
