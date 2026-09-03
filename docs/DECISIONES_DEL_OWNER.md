@@ -1,6 +1,6 @@
 # Decisiones que solo puede tomar el owner
 
-> **Última revisión: 2026-08-15.** Acá está **solo lo que necesita tu respuesta**.
+> **Última revisión: 2026-09-03.** Acá está **solo lo que necesita tu respuesta**.
 > Nada de esto lo puede resolver el sistema, y ninguno se destraba escribiendo
 > código. El trabajo de código abierto vive en [`PENDIENTES.md`](PENDIENTES.md).
 >
@@ -25,6 +25,45 @@ preguntar.
 | 0.6 | **D-8 · todo auxiliar contra el GL**, en todos los tabs, cada despliegue | `app/guillermo/cuadre.py` |
 | 0.7 | **El recálculo NO corre en cada guardado** — botón, «podría hacer 30 actualizaciones» | `Admin → Guillermo` |
 | 0.8 | **Tres niveles de capacidad**: bajo · medio · alto. ⚠️ En los tres, una propuesta del modelo va a la cola: lo que crece es *cuándo actúa*, no *qué decide solo* | `app/guillermo/core.py:NIVELES` |
+
+
+---
+
+## 0.b. Lo decidido el 3 de setiembre de 2026 ✅
+
+Cinco decisiones, todas aplicadas y verificadas contra producción.
+
+| # | Decisión | Dónde vive |
+|---|---|---|
+| 0.b.1 | **Oxygen opera CINCO categorías de habitación** (13 unidades). Las otras cuatro del estándar de ocho quedan **apagadas, no borradas** — apagar es un booleano que se revierte; borrar se lleva por delante 24 tarifas y 24 filas de ocupación ya cargadas | `room_type_configs.active` |
+| 0.b.2 | **Amarena no se toca más.** «Ese ya está correcto; todos los ajustes deben ser en Oxígen» | — |
+| 0.b.3 | **Los actuales de Amarena NO se copian a Oxygen.** Son transacciones reales de otra propiedad: el libro de Oxygen diría que Oxygen incurrió esos gastos, y la pantalla no lo advertiría. Se descartó a favor de construir la Auditoría del presupuesto | `auditoria_api.py` |
+| 0.b.4 | **El lavado que consume Tour Activities se carga a Tours.** No es criterio nuevo: la cuenta vecina `7685` Uniform Laundry ya iba a `OPEX_TOURS`; faltaba la regla de la `7310` | fila en `account_mapping` |
+| 0.b.5 | **El presupuesto se audita por cuenta**, no sólo los actuales. «El presupuesto debe tener GL, siempre debe estar conectado a un GL» | `auditoria_api.py` |
+
+### Lo que se movió con la 0.b.4
+
+Reclasificación pura entre dos departamentos. **Ningún total cambió.**
+
+| Línea | Antes | Después |
+|---|---|---|
+| `OPEX_ROOMS` | 391.486,54 | 390.125,25 |
+| `OPEX_TOURS` | 2.207,40 | 3.568,69 |
+| `TOTAL_REVENUES` · `TOTAL_OPERATING_EXPENSES` · `GOP` · `NET_PROFIT` | — | **sin cambio** |
+
+⚠️ **Amarena tiene el mismo hueco** (`0150`/`7310`, 582,93 al año cargados a
+Rooms) y **queda como está** por la decisión 0.b.2.
+
+### Lo que sigue esperando dato, no decisión
+
+* **Oxygen no tiene actuales cargados** (`actual_entries` = 0). Sin ellos el
+  `ACTUAL Final 2026` está vacío y el `FORECAST Working 2026` tiene corte 0 —es
+  proyección pura, no mezcla real+forecast— y no tiene ninguna fila de gasto.
+* **Los presupuestos 2026 y 2027 arrancan en junio.** Enero a mayo están en cero
+  en los datos, verificado tabla por tabla: no es un problema de pantalla.
+* `DEPRECIATION` y `FINANCIAL EXPENSES` en cero.
+* Oxygen no tiene `BUDGET Final 2026`.
+* `SH09` existe fuera del estándar de ocho códigos; hoy apagada.
 
 ---
 
