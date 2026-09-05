@@ -33,6 +33,7 @@ from app.models.cashflow_params import CashFlowParams
 from app.models.tax_params import TaxParams
 from app.engine import recalculate as recalc
 from app.engine import pl_engine
+from app.engine import kpis as kpis_engine
 from app.engine.cashflow_budget import (
     compute_cashflow_budget, compute_wc_calibration, wc_actuals_from_balances,
     wc_breakdown, wc_cost_base, overrides_from_version_rows, INPUT_KEYS,
@@ -91,19 +92,26 @@ def _kpis(r) -> dict:
     }
 
 
-def _kpis_from_stat(s: ScenarioStat) -> dict:
-    """KPIs from a ScenarioStat row. RevPAR derived as adr*occupied/available."""
-    avail = s.rooms_available
-    occ = float(s.rooms_occupied)
-    adr = float(s.adr)
-    return {
-        "rooms_available": avail,
-        "rooms_occupied": occ,
-        "guests": float(s.guests),
-        "occupancy_pct": float(s.occupancy_pct),
-        "adr": adr,
-        "revpar": (adr * occ / avail) if avail else 0.0,
-    }
+def _kpis_from_stat(s: ScenarioStat, ingreso_habitaciones=None) -> dict:
+    """KPIs a partir de una fila de `ScenarioStat`.
+
+    Las NOCHES salen siempre de la fila (decisión del 2026-08-17: mandan
+    `scenario_stats`). La ocupación se deriva de esas noches, y el ADR del
+    `ingreso_habitaciones` cuando lo hay — ver `engine/kpis.py`, que explica por
+    qué ese ingreso es `RevenueResult.rooms` y **nunca** la línea `REV_ROOMS`.
+
+    Sin `ingreso_habitaciones` —ACTUAL, o cualquier escenario donde lo subido
+    manda— queda el ADR guardado, que es exactamente lo que hacía esta función
+    antes.
+    """
+    return kpis_engine.kpis_de_habitaciones(
+        rooms_available=s.rooms_available,
+        rooms_occupied=s.rooms_occupied,
+        guests=s.guests,
+        ingreso_habitaciones=ingreso_habitaciones,
+        adr_guardado=s.adr,
+        occupancy_guardada=s.occupancy_pct,
+    )
 
 
 async def _get_scenario_or_404(session, scenario_id: str) -> Scenario:
@@ -141,6 +149,15 @@ async def _monthly_results(session, scenario) -> list[dict]:
     """
     is_actual = scenario.type == "ACTUAL"
     revenue_results = None if is_actual else await recalc.load_revenue_results(session, scenario)
+
+    # ¿Se puede derivar el ADR del ingreso, o manda el guardado? Sólo se deriva en
+    # los escenarios que se CALCULAN. La pregunta es por el ORIGEN del dato, no por
+    # el tipo: un BUDGET o un FORECAST importado es tan histórico como un ACTUAL
+    # —sus cifras salieron de un archivo—, y ahí el P&L muestra lo subido mientras
+    # las tarifas dirían otra cosa. Derivar de las tarifas daría un ADR que no
+    # corresponde al ingreso de al lado, que es justo el defecto que se arregla.
+    # Ver `recalc.lo_subido_manda` y `engine/kpis.py`.
+    se_deriva = not is_actual and not await recalc.lo_subido_manda(session, scenario)
 
     # Room KPIs: prefer ScenarioStat (authoritative, covers all scenario types).
     # Fallback to HistoricalKpi for ACTUAL, or rate-card revenue_results otherwise.
@@ -181,10 +198,21 @@ async def _monthly_results(session, scenario) -> list[dict]:
     out = []
     for month in range(1, 13):
         lines = await recalc.compute_pl_month(session, scenario, month, revenue_results)
+        # Ingreso PURO de habitaciones del mes, para derivar el ADR al leer en vez
+        # de arrastrar el que quedó guardado en el último Recalcular. Es
+        # `RevenueResult.rooms` —la tarifa, que nunca pasó por las cuentas—, NO la
+        # línea `REV_ROOMS`: ver `engine/kpis.py` y `docs/PENDIENTES.md` A4.
+        #
+        # ⚠️ En los meses CERRADOS de un forecast va en None a propósito: ese
+        # ingreso lo pone el ACTUAL enlazado, no las tarifas de este escenario, así
+        # que su ADR es el del PMS y no se deriva.
+        ingreso_hab = (revenue_results.get(month) if (se_deriva and revenue_results)
+                       else None)
+        ingreso_hab = getattr(ingreso_hab, "rooms", None) if ingreso_hab else None
         if through >= month and month in actual_stat_kpis:
             kpis = _kpis_from_stat(actual_stat_kpis[month])
         elif month in stat_kpis:
-            kpis = _kpis_from_stat(stat_kpis[month])
+            kpis = _kpis_from_stat(stat_kpis[month], ingreso_hab)
         else:
             kpis_src = hist_kpis.get(month) if is_actual else (
                 revenue_results[month] if revenue_results else None)

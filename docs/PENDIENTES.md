@@ -1841,6 +1841,38 @@ contaminación posible porque tampoco hay apertura de cuentas.
 Lo cuidan `test_adr_sale_de_las_estadisticas_no_de_la_linea` y
 `test_el_adr_agregado_pondera_por_noches_ocupadas` en `tests/test_pl_ytd.py`.
 
+##### ✅ 2026-09-05 — el ADR dejó de depender del botón Recalcular
+
+Owner: *«necesito que derives el ADR y todos los kpi que dependen de
+recalculo»*.
+
+Lo de arriba resolvió **de dónde** sale el ADR. Quedaba **cuándo**:
+`scenario_stats.adr` sólo se refresca cuando corre `_persist_room_stats`, o sea
+en el recálculo. Entre que se movía una tarifa y que alguien apretaba el botón,
+el P&L de doce meses mostraba un ADR viejo **al lado del ingreso nuevo** — y no
+en cero, sino en un número creíble, que es peor. Encima el endpoint mensual
+(`/pl/{id}/month/{m}/`) sí derivaba: las dos pantallas podían dar distinto ADR
+para el mismo mes.
+
+**Ahora la misma cuenta del recálculo se hace al LEER** (`engine/kpis.py`, puro,
+sin base). El numerador **sigue sin ser la línea del P&L**: es
+`RevenueResult.rooms` —la tarifa, que nunca pasó por las cuentas—, así que la
+decisión de arriba queda intacta y las dos pruebas siguen verdes.
+
+| | |
+|---|---|
+| BUDGET / FORECAST calculados | ADR derivado al leer, `ingreso ÷ noches ocupadas` |
+| ACTUAL, y todo donde **lo subido manda** | manda `scenario_stats`, como antes — sus cifras salieron de un archivo y las tarifas dirían otra cosa |
+| Meses cerrados de un forecast | manda el ACTUAL enlazado: ese ingreso no lo ponen las tarifas de este escenario |
+| `occupancy_pct` | de las dos noches de su misma fila, que podían no coincidir con la columna |
+| `revpar` | `ADR × ocupación`, para no romper la identidad |
+
+⚠️ **Sin ingreso, o sin noches ocupadas, queda el guardado — no se pone cero.**
+Un cero se lee como dato, no como dato que falta.
+
+Lo cuida `tests/test_adr_no_depende_del_recalculo.py` (6 pruebas). Suite
+completa: 4.236 verdes.
+
 ### A5 · Dato de prueba en la Cafetería (0220) — ✅ CERRADO, NO HAY (2026-08-12)
 
 Una nota del **2026-08-09** marcó «$51,886 de dato de prueba dentro de 5
