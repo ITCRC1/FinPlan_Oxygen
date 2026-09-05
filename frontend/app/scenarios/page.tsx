@@ -78,22 +78,31 @@ export default function ScenariosPage() {
       // una lista ordenada por año descendente: eso caía siempre en
       // "Budget Working 2035", que está vacío. Copiar de ahí daba una copia
       // vacía y el único aviso era un «copiadas 0 filas» al final.
-      if (!sourceId && all.length) {
+      if (all.length) {
         const conDatos = all.filter(s => !vacios[s.id]);
         const elegibles = conDatos.length ? conDatos : all;
         // Entre los que tienen datos, la versión "Working" es la que manda en
         // esta casa (misma regla que el escenario por defecto). Sin esta
         // preferencia caía en "Draft1 2027" solo por orden alfabético.
         const budgets = elegibles.filter(s => s.type === "BUDGET");
-        setSourceId((budgets.find(s => /working/i.test(s.version))
-          ?? budgets[0] ?? elegibles[0]).id);
+        const elegido = (budgets.find(s => /working/i.test(s.version))
+          ?? budgets[0] ?? elegibles[0]).id;
+        // ⚠️ Se elige con el actualizador de función —`prev || elegido`— y NO
+        // leyendo `sourceId`. Leerlo obligaba a listarlo en las dependencias de
+        // `load`, y como `load` lo ESCRIBE, el efecto se volvía a disparar solo:
+        // cada entrada a la pantalla corría DOS VECES `ensure-working`,
+        // `GET /scenarios/` y el inventario de copia. Verificado en los logs de
+        // producción el 2026-09-05, las seis llamadas duplicadas en orden.
+        // Así el preseleccionado sigue respetando lo que el usuario ya eligió,
+        // pero sin depender del valor.
+        setSourceId(prev => prev || elegido);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setLoading(false);
     }
-  }, [sourceId]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
