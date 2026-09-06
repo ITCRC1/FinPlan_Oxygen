@@ -549,6 +549,56 @@ def filas_clase9(blocks: list[dict]) -> list[dict]:
     return fuera
 
 
+#: La cuenta de la que sale el ADR: renta de habitación pura. NO la 4001
+#: (Cancellations) ni la 4002 (No Show) — un no-show no ocupa habitación, así que
+#: su ingreso no puede estar en el numerador de una tarifa por habitación
+#: ocupada. Es la decisión A4 del owner (`docs/PENDIENTES.md`).
+CUENTA_ADR = "4000"
+
+#: Rango en que un ADR en DÓLARES es creíble para esta propiedad. Ancho a
+#: propósito: no está para juzgar si la tarifa es buena, sino para atrapar un
+#: error de MAGNITUD. El presupuesto de Oxygen anda en 375-400 y los actuales
+#: entre 280 y 580.
+ADR_USD_MIN = Decimal("50")
+ADR_USD_MAX = Decimal("2000")
+
+
+def aviso_de_moneda(stats: dict[int, dict]) -> str | None:
+    """¿El archivo parece venir en COLONES en vez de dólares?
+
+    **Por qué existe.** La contabilidad de la propiedad se lleva en QuickBooks y
+    en colones; la app reporta en dólares. Pero el importador del mayor **no
+    convierte nada ni tiene columna de moneda**: `actual_entries` es `jan..dec` y
+    punto. Un archivo exportado en colones entra 1:1, multiplica todo por el tipo
+    de cambio (~500), y **no falla nada**: el P&L cierra consigo mismo porque
+    todo está inflado igual, la verificación de arriba contra abajo también
+    cuadra —los dos lados salen del mismo archivo—, y nadie se entera.
+
+    A diferencia del resto del sistema, acá no hay un total contra el cual
+    cuadrar. Lo único que delata la escala es el **ADR**, que tiene un rango
+    conocido: en colones daría ~200.000 en vez de ~400.
+
+    Devuelve el aviso, o `None` si no hay nada que decir. Función PURA.
+    """
+    medidos = [(m, d["adr"]) for m, d in sorted(stats.items()) if d.get("adr")]
+    if not medidos:
+        return None
+    fuera = [(m, a) for m, a in medidos if not (ADR_USD_MIN <= a <= ADR_USD_MAX)]
+    if not fuera:
+        return None
+
+    detalle = ", ".join(f"mes {m}: {a:,.2f}" for m, a in fuera[:6])
+    if all(a > ADR_USD_MAX for _, a in fuera):
+        causa = ("Da como si el archivo estuviera en COLONES: al tipo de cambio "
+                 "esos valores equivalen a una tarifa normal en dólares.")
+    else:
+        causa = ("Puede ser el ingreso de habitaciones o las noches ocupadas lo "
+                 "que está mal en el archivo.")
+    return (f"El ADR que sale del archivo no es creíble en dólares "
+            f"({len(fuera)} de {len(medidos)} meses fuera de "
+            f"{ADR_USD_MIN:,.0f}–{ADR_USD_MAX:,.0f}): {detalle}. {causa}")
+
+
 def consolidate_block(blk: dict, mappings: list[dict], report_lines: list[dict],
                       filas_extra: dict[int, list[dict]] | None = None) -> dict:
     """Consolida un bloque del GL (cuentas 4-8 + planilla) al P&L por línea usando
@@ -630,11 +680,34 @@ def consolidate_block(blk: dict, mappings: list[dict], report_lines: list[dict],
                      if mm == m and pl_engine.group_for_dept(r["dept_code"]) == "ROOMS"),
                     Decimal(0))
             else:
+                # ⚠️ Se elige por CÓDIGO de cuenta (`4000`), no por nombre.
+                #
+                # Antes comparaba `account_name == "rooms"`, y el nombre lo pone el
+                # archivo: en el mayor de Oxygen la 4000 se llama «Room Revenue», así
+                # que no hacía match, `rooms_rev` quedaba en cero y **el ADR nunca se
+                # escribía**. Medido en producción el 2026-09-05: el ACTUAL 2026 tenía
+                # los siete meses con ingreso y noches cargados y el ADR en 0,00,
+                # mientras el 2025 —que va por la rama del departamento— estaba bien.
+                #
+                # El nombre ya había cambiado tres veces en esta misma cuenta
+                # («Cancellations» en 2024, «No Show» en 2025, «Rooms» en el Budget
+                # 2026 Final): es el dato menos estable del archivo. El código es el
+                # que fija A4 (`docs/PENDIENTES.md`), y es el que excluye No Show y
+                # Cancellations, que viven en la 4002 y la 4001.
                 rooms_rev = sum(
                     (Decimal(str(v)) for r in blk.get("revenue", [])
                      for mm, v in r["months"].items()
-                     if mm == m and (r.get("account_name") or "").strip().lower() == "rooms"),
+                     if mm == m and (r.get("account_code") or "").strip() == CUENTA_ADR),
                     Decimal(0))
+                if not rooms_rev:
+                    # Respaldo para un archivo sin número de cuenta en esa fila: el
+                    # criterio viejo, por nombre. Es peor, pero es mejor que un cero.
+                    rooms_rev = sum(
+                        (Decimal(str(v)) for r in blk.get("revenue", [])
+                         for mm, v in r["months"].items()
+                         if mm == m
+                         and (r.get("account_name") or "").strip().lower() == "rooms"),
+                        Decimal(0))
             if rooms_rev:
                 d["adr"] = rooms_rev / Decimal(str(occ))
         stats[m] = d

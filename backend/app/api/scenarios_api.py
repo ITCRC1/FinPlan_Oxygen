@@ -1853,7 +1853,7 @@ async def import_gl_detail(
     # dólar contra el Dashboard (Actual 2026 / Budget 2026).
     from app.engine.recalculate import load_active_account_mappings, load_report_line_config
     from app.engine import pl_engine
-    from app.importers.gl_detail_importer import consolidate_block
+    from app.importers.gl_detail_importer import consolidate_block, aviso_de_moneda
     mappings = await load_active_account_mappings(db)
     report_lines = await load_report_line_config(db)
     # Versión explícita: si el owner eligió el escenario destino en la UI, TODOS los
@@ -1878,6 +1878,12 @@ async def import_gl_detail(
     verificaciones: dict[int, dict] = {}
     consolidados: dict[int, dict] = {}
     choques: list[tuple[str, dict]] = []
+    # La contabilidad se lleva en colones y la app reporta en dólares, pero el
+    # importador del mayor no convierte ni sabe de moneda. Un archivo en colones
+    # entra 1:1 y NADA falla —el P&L cuadra consigo mismo y la verificación de
+    # arriba contra abajo también, porque los dos lados salen del mismo archivo—.
+    # Lo único que delata la escala es el ADR. Ver `aviso_de_moneda`.
+    monedas: list[tuple[str, str]] = []
     for i, blk in enumerate(blocks):
         if not blk.get("verificacion"):
             continue
@@ -1889,6 +1895,9 @@ async def import_gl_detail(
         extra = await _filas_que_sobreviven(db, target, merge, upload_months)
         con = consolidate_block(blk, mappings, report_lines, filas_extra=extra)
         consolidados[i] = con
+        av = aviso_de_moneda(con["stats"])
+        if av:
+            monedas.append((blk["label"], av))
         comparables, cerrados = verificacion_mod.meses_comparables(
             target.type, getattr(target, "actuals_through", 0))
         rep = verificacion_mod.comparar(blk["verificacion"], con["lines"],
@@ -1896,6 +1905,22 @@ async def import_gl_detail(
         verificaciones[i] = rep
         if rep["bloquea"]:
             choques.append((blk["label"], rep))
+
+    if monedas and not confirmar_diferencias:
+        # Va ANTES del choque de verificación y antes de cualquier escritura: un
+        # archivo en la moneda equivocada no tiene nada que discutir bucket por
+        # bucket, está mal por un factor de ~500. Usa la misma salida de
+        # emergencia (`confirmar_diferencias`) porque el owner puede tener una
+        # propiedad con tarifas fuera de rango y saberlo.
+        raise ErrorApi(409, "gl.moneda_no_creible", extra={
+            "error": "El archivo parece estar en colones, no en dólares.",
+            "que_hacer": ("Exportá el mayor de QuickBooks en DÓLARES y volvé a "
+                          "subirlo. Si la tarifa de esta propiedad realmente está "
+                          "fuera del rango, volvé a subir con "
+                          "confirmar_diferencias=true."),
+            "bloques": [{"label": lab, "aviso": av} for lab, av in monedas],
+            "texto": "\n".join(f"{lab}: {av}" for lab, av in monedas),
+        })
 
     if choques and not confirmar_diferencias:
         # Nunca en silencio, y nunca un rechazo pelado: el error ES el informe.
