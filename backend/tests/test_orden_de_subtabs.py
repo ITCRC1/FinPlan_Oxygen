@@ -33,13 +33,16 @@ def test_el_PL_viejo_queda_de_ultimo():
 
 
 def test_no_se_perdio_ningun_sub_tab_al_reordenar():
-    """⚠️ Reordenar a mano una lista de dieciocho es como desaparece uno sin
+    """⚠️ Reordenar a mano una lista de diecinueve es como desaparece uno sin
     que nada falle: el sub-tab simplemente deja de estar."""
     claves = _claves()
     esperados = {
         "pl", "revenue", "payroll", "cost", "opex", "property", "consulta",
         "flow", "simple", "summary", "estado", "revdet", "fb", "doce",
         "formato", "auditoria", "resumen12",
+        # Profit by Department: el P&L Detail del owner, colgado de esta fila el
+        # 2026-09-07 («esto debe ir en cierre de mes como un sub tab»).
+        "utilidad",
     }
     assert set(claves) == esperados, (
         f"faltan {esperados - set(claves)}; sobran {set(claves) - esperados}")

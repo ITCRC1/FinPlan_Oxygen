@@ -23,10 +23,17 @@
  * cierra contra la utilidad porque son otro corte del mismo gasto. El cuadre de
  * verdad es el de la vista Cascada, que compara contra el motor.
  */
+import { useMemo } from "react";
+
 import type { PLDetail } from "@/lib/api";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+/** La sección de la cascada que abre la utilidad por departamento. Es el rótulo
+ *  EXACTO de la fila `sec` en `pl_detail_api.CONSOLIDADO`, y el mismo valor que
+ *  `SECCION_UTILIDAD` en `app/export/pl_detail_excel.py`. */
+const SECCION_UTILIDAD = "Operating Profit";
 
 /** Los totales del cuadro del owner, en su orden. */
 const CLAVE = [
@@ -81,6 +88,28 @@ export default function Cierre({ datos, mes }: { datos: PLDetail; mes: number })
     serie ? idx.reduce((s, i) => s + (serie[i] ?? 0), 0) : null;
 
   const porRotulo = (r: string) => datos.filas.find(f => f.rotulo === r);
+
+  /** Las filas `det` que cuelgan de una sección, cortadas por POSICIÓN.
+   *
+   *  Por posición y no por rótulo: los nombres de departamento se repiten en
+   *  las tres secciones de la cascada. Es la MISMA regla que
+   *  `_filas_de_seccion` en `app/export/pl_detail_excel.py`, para que la
+   *  pantalla y el Excel muestren la misma fila. */
+  const filasDeSeccion = useMemo(() => {
+    const out: typeof datos.filas = [];
+    let dentro = false;
+    for (const f of datos.filas) {
+      if (f.tipo === "sec") {
+        if (dentro) break;
+        dentro = f.rotulo === SECCION_UTILIDAD;
+        continue;
+      }
+      if (!dentro) continue;
+      if (f.tipo === "tot" || f.tipo === "sub") break;
+      if (f.tipo === "det") out.push(f);
+    }
+    return out;
+  }, [datos.filas]);
 
   /** Una fila del cuadro: por cada corte, una celda por versión + Var $ + Var %. */
   const fila = (rotulo: string, series: (number[] | null | undefined)[],
@@ -205,6 +234,33 @@ export default function Cierre({ datos, mes }: { datos: PLDetail; mes: number })
             const f = porRotulo(r);
             return f ? fila(r, f.series, true) : null;
           })}
+
+          {/* La utilidad POR DEPARTAMENTO.
+            *
+            * Owner, 2026-09-07: «tab de cierre pon la vista de profit … por
+            * departamento». El cuadro traía sólo los diez totales, y el aporte
+            * de cada departamento —lo que dice dónde mirar— quedaba afuera.
+            *
+            * ⚠️ Se corta por SECCIÓN, no por rótulo: «Rooms» está tres veces en
+            * la cascada (ingreso, gasto y utilidad). `porRotulo` usa `find`, o
+            * sea que pedir «Rooms» por nombre devuelve el INGRESO — y el
+            * exportador de Excel, que indexa con un dict, devolvería la
+            * UTILIDAD. Dos números distintos para la misma fila y ninguno
+            * falla. `filasDeSeccion` mira la posición, que no es ambigua. */}
+          {filasDeSeccion.length > 0 && (
+            <>
+              <tr><td colSpan={1 + cortes.length * porBloque} style={{ height: 9 }} /></tr>
+              <tr>
+                <td colSpan={1 + cortes.length * porBloque}
+                    style={{ ...TDL, fontWeight: 700, fontSize: 11.5,
+                             background: "var(--bg-surface)",
+                             color: "var(--text-secondary)" }}>
+                  {SECCION_UTILIDAD} — por departamento
+                </td>
+              </tr>
+              {filasDeSeccion.map(f => fila("   " + f.rotulo, f.series))}
+            </>
+          )}
 
           <tr><td colSpan={1 + cortes.length * porBloque} style={{ height: 9 }} /></tr>
 

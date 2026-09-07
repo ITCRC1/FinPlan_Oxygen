@@ -81,6 +81,38 @@ def _celda(ws, r, c, valor, formato, *, negrita=False, izq_gruesa=False,
     return x
 
 
+#: La sección de la cascada que abre la utilidad por departamento. Es el rótulo
+#: EXACTO de la fila `sec` en `pl_detail_api.CONSOLIDADO`.
+SECCION_UTILIDAD = "Operating Profit"
+
+
+def _filas_de_seccion(filas: list[dict], seccion: str) -> list[dict]:
+    """Las filas `det` que cuelgan de una sección, cortadas por POSICIÓN.
+
+    ⚠️ Por posición y no por rótulo a propósito: los nombres de departamento se
+    repiten en las tres secciones de la cascada (REVENUES, Operating Expenses,
+    Operating Profit), así que buscar «Rooms» por nombre puede devolver
+    cualquiera de las tres — y devolvería distinto acá que en la pantalla, que
+    usa `find`. Se arranca en la fila `sec` que coincide y se toman las `det`
+    hasta que aparece otra sección o un total.
+    """
+    out: list[dict] = []
+    dentro = False
+    for f in filas:
+        if f["tipo"] == "sec":
+            if dentro:
+                break
+            dentro = f["rotulo"] == seccion
+            continue
+        if not dentro:
+            continue
+        if f["tipo"] in ("tot", "sub"):
+            break
+        if f["tipo"] == "det":
+            out.append(f)
+    return out
+
+
 def _hoja_cierre(wb: Workbook, d: dict, mes: int) -> None:
     """Los tres cortes lado a lado, cada uno con sus versiones."""
     ws = wb.create_sheet("Cierre")
@@ -190,6 +222,28 @@ def _hoja_cierre(wb: Workbook, d: dict, mes: int) -> None:
             escribir(r, x["series"], MONEDA, negrita=True,
                      relleno=C["blue_header"])
 
+    # ── La utilidad POR DEPARTAMENTO ─────────────────────────────────────────
+    #
+    # Owner, 2026-09-07: *«tab de cierre pon la vista de profit … por
+    # departamento»*. El cuadro de cierre traía sólo los diez totales; el aporte
+    # de cada departamento —lo que decide dónde mirar— quedaba fuera.
+    #
+    # ⚠️ **Se selecciona por SECCIÓN, no por rótulo.** «Rooms» aparece TRES veces
+    # en la cascada: en REVENUES, en Operating Expenses y en Operating Profit. El
+    # `porRotulo` de arriba es un dict, así que para un rótulo repetido se queda
+    # con el ÚLTIMO; y la pantalla usa `find`, que toma el PRIMERO. Pedir «Rooms»
+    # por nombre daría el ingreso en un lado y la utilidad en el otro, sin que
+    # nada falle. `_filas_de_seccion` corta el bloque por posición, que es lo
+    # único que no es ambiguo.
+    filas_dep = _filas_de_seccion(d["filas"], SECCION_UTILIDAD)
+    if filas_dep:
+        fila += 1
+        escribir(f"{SECCION_UTILIDAD} — por departamento", None, MONEDA,
+                 negrita=True, relleno=C["gray_light"],
+                 razon=lambda i, k: None)
+        for x in filas_dep:
+            escribir("    " + x["rotulo"], x["series"], MONEDA)
+
     fila += 1
     for k, rot in d["clases_rotulos"]:
         escribir(rot, [c[k] for c in d["clases"]], MONEDA)
@@ -206,20 +260,54 @@ def _hoja_cierre(wb: Workbook, d: dict, mes: int) -> None:
 
 
 def _hoja_cascada(wb: Workbook, d: dict) -> None:
-    """Los doce meses abiertos, con el detalle por línea, de la versión principal."""
-    ws = wb.create_sheet("Cascada")
-    f = _titulo(ws, 1, f"P&L Detail — {d['titulo_ambito']}",
-                f"{d['escenario']} · {d['nota_ambito']} · USD")
+    """Los doce meses abiertos, con el detalle por línea, de CADA versión.
 
-    cab = ["ACCOUNT DESCRIPTION"] + MES_CORTO + ["Full Year"]
-    for i, t in enumerate(cab, start=1):
-        x = ws.cell(row=f, column=i, value=t)
+    Owner, 2026-09-07: *«que salgan los 2 años comparativos 12 meses en el
+    excel»*.
+
+    Antes bajaba `series[0]` y nada más: las versiones que el owner elegía para
+    comparar en pantalla no llegaban al archivo, y el Excel mostraba un año
+    donde la pantalla mostraba dos. Ahora cada versión trae su bloque de doce
+    meses más su Full Year, uno al lado del otro, con encabezado de dos pisos —
+    la versión arriba, los meses abajo— igual que la hoja de Cierre.
+    """
+    ws = wb.create_sheet("Cascada")
+    vs = d["versiones"]
+    n = len(vs)
+    por_bloque = 13  # doce meses + Full Year
+    f = _titulo(ws, 1, f"P&L Detail — {d['titulo_ambito']}",
+                " · ".join([v["escenario"] for v in vs])
+                + f" · {d['nota_ambito']} · USD")
+
+    # ── Encabezado de dos pisos: la versión arriba, los meses abajo ──────────
+    ws.cell(row=f, column=1, value="ACCOUNT DESCRIPTION")
+    for r in (f, f + 1):
+        x = ws.cell(row=r, column=1)
         x.fill = fill(C["navy"])
         x.font = font(bold=True, color=C["white"], size=9.5)
-        x.alignment = align("center" if i > 1 else "left", wrap=True)
+        x.alignment = align("left")
         x.border = _borde()
+    ws.merge_cells(start_row=f, start_column=1, end_row=f + 1, end_column=1)
 
-    fila = f + 1
+    col = 2
+    for v in vs:
+        ws.merge_cells(start_row=f, start_column=col,
+                       end_row=f, end_column=col + por_bloque - 1)
+        x = ws.cell(row=f, column=col, value=v["escenario"])
+        x.fill = fill(C["navy"])
+        x.font = font(bold=True, color=C["white"], size=10)
+        x.alignment = align("center")
+        for k in range(por_bloque):
+            ws.cell(row=f, column=col + k).border = _borde(k == 0)
+        for k, t in enumerate(MES_CORTO + ["Full Year"]):
+            y = ws.cell(row=f + 1, column=col + k, value=t)
+            y.fill = fill(C["navy_mid"])
+            y.font = font(bold=True, color=C["white"], size=8.5)
+            y.alignment = align("center", wrap=True)
+            y.border = _borde(k == 0)
+        col += por_bloque
+
+    fila = f + 2
     for x in d["filas"]:
         if x["tipo"] == "esp":
             fila += 1
@@ -229,12 +317,18 @@ def _hoja_cascada(wb: Workbook, d: dict) -> None:
                    else C["gray_light"] if x["tipo"] == "sec" else None)
         rot = ("    " if x["tipo"] == "det" else "") + x["rotulo"]
         _celda(ws, fila, 1, rot, None, negrita=fuerte, relleno=relleno, texto=True)
-        serie = x["series"][0]
-        for m in range(12):
-            _celda(ws, fila, 2 + m, serie[m] if serie else None, MONEDA,
-                   negrita=fuerte, relleno=relleno)
-        _celda(ws, fila, 14, sum(serie) if serie else None, MONEDA,
-               negrita=True, relleno=relleno)
+        c = 2
+        for i in range(n):
+            # Una versión sin serie en esta fila (la sección, el espaciador) deja
+            # el bloque en blanco: mejor vacío que un cero, que se leería como
+            # dato.
+            serie = x["series"][i] if i < len(x["series"]) else None
+            for m in range(12):
+                _celda(ws, fila, c + m, serie[m] if serie else None, MONEDA,
+                       negrita=fuerte, izq_gruesa=(m == 0), relleno=relleno)
+            _celda(ws, fila, c + 12, sum(serie) if serie else None, MONEDA,
+                   negrita=True, relleno=relleno)
+            c += por_bloque
         fila += 1
 
     fila += 1
@@ -247,8 +341,13 @@ def _hoja_cascada(wb: Workbook, d: dict) -> None:
     x.font = font(bold=True, size=10,
                   color=C["green_dark"] if cuadra else "B00020")
 
-    set_col_widths(ws, {1: 44, **{2 + i: 14 for i in range(12)}, 14: 16})
-    ws.freeze_panes = ws.cell(row=f + 1, column=2)
+    anchos = {1: 44}
+    for i in range(n * por_bloque):
+        # La última columna de cada bloque es el Full Year: más ancha, porque
+        # lleva el número grande.
+        anchos[2 + i] = 16 if (i % por_bloque) == 12 else 13
+    set_col_widths(ws, anchos)
+    ws.freeze_panes = ws.cell(row=f + 2, column=2)
 
 
 def export_pl_detail(d: dict, mes: int) -> bytes:

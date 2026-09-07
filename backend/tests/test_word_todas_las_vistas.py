@@ -25,6 +25,13 @@ SIN_CAPITULO = {
     # elijan en el momento y de un «agrupar por» que cambia hasta las columnas.
     # Un capítulo fijo tendría que inventar una consulta.
     "consulta",
+    # No es un cuadro de esta pantalla: RENDERIZA el P&L Detail que vive en
+    # `app/month-end/pl-detail/`, con sus propios selectores (ámbito, versiones,
+    # mes) y **su propio Excel**, que además baja los doce meses de cada versión
+    # y la utilidad por departamento. Un capítulo acá tendría que elegir por el
+    # owner qué ámbito y qué versiones mostrar, y duplicaría un reporte que ya
+    # se baja completo desde su propio botón. Owner, 2026-09-07.
+    "utilidad",
 }
 
 

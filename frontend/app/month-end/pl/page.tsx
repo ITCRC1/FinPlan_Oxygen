@@ -1666,6 +1666,21 @@ export default function MonthEndPLPage() {
         })),
       }];
     },
+    utilidad: async () => {
+      // ⚠️ Utilidad por departamento NO tiene capítulo, y no es un olvido.
+      //
+      // Este sub-tab no arma un cuadro propio: RENDERIZA el P&L Detail que vive
+      // en `app/month-end/pl-detail/`, con sus propios selectores —ámbito
+      // (Consolidado / Hotel / Club), hasta cuatro versiones, y el corte Mes /
+      // YTD / Full Year—. Un capítulo fijo tendría que elegir por el owner qué
+      // ámbito y qué versiones mostrar.
+      //
+      // Y no hace falta: ese reporte tiene su PROPIO Excel, que desde el
+      // 2026-09-07 baja los doce meses de cada versión y abre la utilidad por
+      // departamento en el cuadro de cierre. Es más completo que un capítulo.
+      return [];
+    },
+
     consulta: async () => {
       // ⚠️ Consulta GL NO tiene capítulo, y no es un olvido.
       //
