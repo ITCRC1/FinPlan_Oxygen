@@ -2808,7 +2808,8 @@
     "tab_doce": "12 meses",
     "tab_formato": "Formato",
     "tab_auditoria": "Auditoría",
-    "tab_resumen12": "Resumen 12m"
+    "tab_resumen12": "Resumen 12m",
+    "tab_utilidad": "Utilidad x depto"
   },
   "otb": {
     "a851Nota1": "{metrica} por {unidad}:",
