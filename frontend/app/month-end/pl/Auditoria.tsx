@@ -93,16 +93,29 @@ function primeroDe(escenarios: Scenario[], tipo: string): string {
   return id || escenarios.find(s => s.type === tipo)?.id || escenarios[0]?.id || "";
 }
 
-export default function Auditoria({ escenarios, inicial, mesInicial = 12, compacto = true }: {
+export default function Auditoria({ escenarios, inicial, mes, horizonte = "month",
+                                   compacto = true }: {
   escenarios: Scenario[];
   inicial?: string;
-  mesInicial?: number;
+  /** ⚠️ El mes lo MANDA la pantalla. No hay estado propio ni selector acá.
+   *
+   *  Owner, 2026-09-08: *«el único que debe escoger es la parte de arriba y
+   *  todo lo de abajo debe responder a ese mandato; hay una variable intermedia
+   *  para escoger pero no debe aplicar ya que el sistema se confunde»*.
+   *
+   *  Antes esto era `useState(mesInicial)`, que lee la prop UNA sola vez: al
+   *  cambiar el mes arriba, la auditoría seguía mostrando el de cuando se
+   *  montó, y los dos selectores decían cosas distintas sin avisar. */
+  mes: number;
+  /** El ámbito de la pantalla. La auditoría es SIEMPRE mensual —cuadra el
+   *  detalle de un mes contra las líneas del motor de ese mes— así que en YTD o
+   *  año completo se dice cuál mes se está mirando en vez de fingir que suma. */
+  horizonte?: "month" | "ytd" | "full";
   /** Esconder lo que está en cero. Lo manda la pantalla: el interruptor es uno
    *  solo para todos los sub-tabs. */
   compacto?: boolean;
 }) {
   const [scenarioId, setScenarioId] = useState("");
-  const [mes, setMes] = useState(mesInicial);
   const [datos, setDatos] = useState<Datos | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,9 +243,12 @@ export default function Auditoria({ escenarios, inicial, mesInicial = 12, compac
             <option key={s.id} value={s.id}>{s.type} · {s.version} · {s.year}</option>
           ))}
         </select>
-        <select value={mes} onChange={e => setMes(Number(e.target.value))} style={SEL}>
-          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
+        <span style={{ fontSize: 12.5, color: "var(--text-secondary)",
+                       padding: "0 4px" }}>
+          {horizonte === "month"
+            ? MESES[mes - 1]
+            : `${MESES[mes - 1]} — la auditoría es mensual`}
+        </span>
         <button onClick={() => setSoloDif(x => !x)}
           title="Dejar sólo los renglones cuyo detalle no suma lo que dice el motor"
           style={{ ...SEL, cursor: "pointer", fontWeight: 600,
