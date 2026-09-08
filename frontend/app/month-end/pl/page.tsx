@@ -1384,8 +1384,12 @@ export default function MonthEndPLPage() {
     auditoria: async () => {
       const id = ranuras[varA];
       if (!id) return [];
-      const a = await getAuditoria(id, mes);
-      const cab = `${a.escenario} · ${MESES[mes - 1]} ${year} · USD`;
+      // ⚠️ El MISMO ámbito que la pantalla, y el rótulo del backend.
+      // Si el Excel bajara siempre el mes suelto, el archivo diría «Julio»
+      // mientras la pantalla muestra el acumulado — y el que lo abra mañana no
+      // tendría cómo notar la diferencia.
+      const a = await getAuditoria(id, mes, horizonte);
+      const cab = `${a.escenario} · ${a.periodo} ${year} · USD`;
 
       // ⚠️ La Auditoría son TRES cuadros, no uno. El capítulo armaba sólo el
       // primero —el cuadre— y el owner lo vio enseguida: «el tab de auditoría

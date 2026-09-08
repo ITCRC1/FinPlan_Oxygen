@@ -387,6 +387,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "clase.desconocida": {
         "es": "Clase inválida: se espera revenue, cost, payroll, opex o property",
         "en": "Invalid class: expected revenue, cost, payroll, opex or property"},
+    "horizonte.invalido": {
+        "es": "El ámbito tiene que ser month, ytd o full",
+        "en": "Scope must be month, ytd or full"},
     "mes.rango_invalido": {
         "es": "from_month/to_month tienen que estar entre 1 y 12, y from ≤ to",
         "en": "from_month/to_month must be between 1 and 12, with from ≤ to"},

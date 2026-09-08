@@ -2734,6 +2734,14 @@ export interface AuditoriaDepto {
 }
 export interface Auditoria {
   scenario_id: string; escenario: string; year: number; mes: number;
+  /** El ámbito que se auditó, tal como lo mandó la pantalla. Viaja de vuelta
+   *  para que el reporte —y su Excel— digan qué período son. */
+  horizonte: "month" | "ytd" | "full";
+  /** Los meses que se acumularon. Es la prueba de qué se sumó: en `ytd` de
+   *  julio son [1..7], en `full` los doce. */
+  meses: number[];
+  /** El rótulo listo para mostrar: «Julio», «Acumulado a Julio», «Año completo». */
+  periodo: string;
   detalle: AuditoriaFila[];
   cuadre: AuditoriaCuadre[];
   departamentos: AuditoriaDepto[];
@@ -2754,11 +2762,19 @@ export interface Auditoria {
    *  segunda aritmética que el día que cambie el P&L deje de cuadrar. */
   resumen: { ingresos: number; gastos: number; neto: number };
 }
+/** ⚠️ El `horizonte` NO tiene default acá a propósito.
+ *
+ *  Owner, 2026-09-08: *«todo debe moverse con la parte de arriba… no debe
+ *  haber variable de decisión intermedia»*. Un default en esta función sería
+ *  exactamente esa variable intermedia: el día que un llamador se olvide de
+ *  pasarlo, la auditoría contestaría por un período que nadie eligió y se
+ *  vería igual de bien. Que el compilador lo exija es más barato. */
 export async function getAuditoria(
-  scenarioId: string, mes: number,
+  scenarioId: string, mes: number, horizonte: "month" | "ytd" | "full",
 ): Promise<Auditoria> {
   return api.get<Auditoria>(
-    `/pl/${encodeURIComponent(scenarioId)}/auditoria/?mes=${mes}`);
+    `/pl/${encodeURIComponent(scenarioId)}/auditoria/`
+    + `?mes=${mes}&horizonte=${horizonte}`);
 }
 
 // ── P&L Detail: Consolidado · Hotel · Club (owner, 2026-08-27) ───────────────

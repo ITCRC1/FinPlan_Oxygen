@@ -56,9 +56,40 @@ def test_la_auditoria_recibe_el_mes_y_el_horizonte():
     assert "mes={mes}" in pagina and "horizonte={horizonte}" in pagina
 
 
-def test_la_auditoria_dice_que_es_mensual_cuando_el_ambito_no_lo_es():
-    """El endpoint cuadra UN mes contra las líneas del motor de ESE mes. En YTD
-    o año completo no puede sumar, así que dice cuál mes está mirando en vez de
-    aparentar que respondió al ámbito."""
+def test_la_auditoria_le_pasa_el_horizonte_al_backend():
+    """Owner, 2026-09-08: *«toda auditoría debe responder a si es mes, YTD o
+    full year»*.
+
+    Al principio el ámbito llegaba al componente y ahí se moría: se usaba sólo
+    para escribir «la auditoría es mensual». Eso obedecía a medias —el rótulo
+    cambiaba, los números no—, que es la forma más cara de no obedecer.
+    """
     aud = (CIERRE / "Auditoria.tsx").read_text(encoding="utf-8")
-    assert "la auditoría es mensual" in aud
+    assert "getAuditoria(scenarioId, mes, horizonte)" in aud
+    assert "la auditoría es mensual" not in aud
+
+
+def test_el_horizonte_esta_en_las_dependencias_de_la_carga():
+    """⚠️ Sin `horizonte` en el `useCallback`, cambiar de mes a YTD no volvía a
+    pedir nada: la pantalla mostraba el período anterior con el rótulo nuevo,
+    que es peor que no cambiar nada."""
+    aud = (CIERRE / "Auditoria.tsx").read_text(encoding="utf-8")
+    i = aud.index("getAuditoria(scenarioId, mes, horizonte)")
+    assert "[scenarioId, mes, horizonte]" in aud[i:i + 1200]
+
+
+def test_el_rotulo_del_periodo_lo_dice_el_backend():
+    """Sólo el backend sabe qué meses acumuló. Un texto armado en la pantalla
+    podría decir «Acumulado a Julio» mientras abajo hay otra cosa, y nada
+    fallaría."""
+    aud = (CIERRE / "Auditoria.tsx").read_text(encoding="utf-8")
+    assert "datos?.periodo" in aud
+
+
+def test_el_excel_del_cierre_baja_el_mismo_periodo_que_la_pantalla():
+    """El botón de Excel llama al endpoint por su cuenta. Si bajara siempre el
+    mes suelto, el archivo diría «Julio» mientras la pantalla muestra el
+    acumulado — y quien lo abra mañana no tiene cómo notarlo."""
+    pagina = (CIERRE / "page.tsx").read_text(encoding="utf-8")
+    assert "getAuditoria(id, mes, horizonte)" in pagina
+    assert "${a.periodo}" in pagina

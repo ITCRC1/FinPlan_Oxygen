@@ -7,7 +7,8 @@ cual el formato y el otro para ver la auditoría de los detalles»*.
 
 ## Qué contesta
 
-Tres preguntas, en un solo viaje, para UN mes:
+Tres preguntas, en un solo viaje, para el período que manda la pantalla
+—un mes, el acumulado a la fecha, o el año completo:
 
 1. **¿De qué está hecha cada línea?** El detalle cuenta por cuenta, agrupado por
    departamento, con la naturaleza (Ingresos · Costo · Payroll · Opex · Reparto ·
@@ -46,7 +47,10 @@ from decimal import Decimal
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from app.api.pl_api import _get_scenario_or_404, _monthly_results, get_session
+from app.api.pl_api import (_aggregate_selected, _ebt_anual,
+                           _get_scenario_or_404, _lo_subido_manda,
+                           _monthly_results, _renta_digitada,
+                           get_session)
 from app.engine import pl_engine
 from app.errores import ErrorApi
 from app.models.actual_entry import ActualEntry
@@ -292,15 +296,61 @@ async def _asientos_del_checkbook(session, escenario) -> list:
 
 
 
+#: Los tres ámbitos de la pantalla, y qué meses abarca cada uno.
+#:
+#: Owner, 2026-09-08: *«todo debe moverse con la parte de arriba… y toda
+#: auditoría debe responder a si es mes, YTD o full year; no debe haber
+#: variable de decisión intermedia»*.
+#:
+#: ⚠️ Son LOS MISMOS TRES que `/pl/compare/` —`month`, `ytd`, `full`— y con los
+#: mismos nombres a propósito: el ámbito viaja desde la pantalla hasta acá sin
+#: traducirse en el camino, que es donde se pierden.
+HORIZONTES = ("month", "ytd", "full")
+
+
+def _meses_del_horizonte(mes: int, horizonte: str) -> list[int]:
+    """`month` → sólo ese mes · `ytd` → 1..mes · `full` → los doce."""
+    if horizonte == "ytd":
+        return list(range(1, mes + 1))
+    if horizonte == "full":
+        return list(range(1, 13))
+    return [mes]
+
+
+#: Los meses en español, para el rótulo. Los de `MESES` son las COLUMNAS de la
+#: tabla (`jan`, `feb`), que son otra cosa y no se muestran.
+_ROTULO_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+               "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
+
+
+def _rotulo_periodo(mes: int, horizonte: str) -> str:
+    if horizonte == "ytd":
+        return "Acumulado a %s" % _ROTULO_MES[mes - 1]
+    if horizonte == "full":
+        return "Año completo"
+    return _ROTULO_MES[mes - 1]
+
+
 @router.get("/pl/{scenario_id}/auditoria/")
-async def auditoria_del_mes(scenario_id: str, mes: int):
-    """El detalle de UN mes, cuadrado contra las líneas del motor."""
+async def auditoria_del_mes(scenario_id: str, mes: int,
+                            horizonte: str = "month"):
+    """El detalle del período, cuadrado contra las líneas del motor.
+
+    El período lo manda la pantalla: mes suelto, acumulado a la fecha, o año
+    completo. **Las dos mitades del cuadre se acumulan sobre los MISMOS meses**
+    —el detalle sumando sus columnas, el motor sumando sus resultados—, que es
+    lo único que hace que un YTD signifique algo: dos acumulados distintos
+    darían una diferencia que no es un error contable sino de aritmética.
+    """
     if not 1 <= mes <= 12:
         raise ErrorApi(422, "mes.rango_invalido")
+    if horizonte not in HORIZONTES:
+        raise ErrorApi(422, "horizonte.invalido")
 
     async with get_session() as session:
         escenario = await _get_scenario_or_404(session, scenario_id)
-        col = MESES[mes - 1]
+        meses = _meses_del_horizonte(mes, horizonte)
+        cols = [MESES[m - 1] for m in meses]
 
         nombres = {
             d.dept_code: d.dept_name
@@ -353,7 +403,11 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
                     or f"Cuenta {cuenta}")
 
         for e in todos:
-            monto = Decimal(str(getattr(e, col, None) or 0))
+            # ⚠️ La MISMA lista de meses que el motor. Ver el `assert`
+            # implícito del docstring: si acá se sumara otro rango, el
+            # descuadre no diría nada del libro contable.
+            monto = sum((Decimal(str(getattr(e, c, None) or 0))
+                         for c in cols), CERO)
             linea = getattr(e, "linea_propia", None)
             tipo = getattr(e, "tipo_propio", "")
             if not linea:
@@ -456,9 +510,28 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         # un día auditen cosas distintas.
         from app.api.pl_detail_api import CONSOLIDADO
 
+        # ⚠️ La columna del motor sale de `_aggregate_selected`, **el mismo
+        # agregador que dibuja el P&L de la pantalla**, no de una suma propia.
+        #
+        # La tentación era sumar `amount_usd` mes a mes: da igual en casi todo,
+        # y no da igual en el impuesto de renta. `_apply_tax_correction` mira el
+        # EBT del AÑO para decidir si una ventana paga —un ejercicio que cierra
+        # en pérdida no paga renta en ningún YTD suyo, por más que ese YTD dé
+        # positivo—. Una suma cruda mostraría un impuesto que el P&L de arriba
+        # no muestra, y la auditoría acusaría de descuadre justo a la línea que
+        # está bien.
+        #
+        # En un ACTUAL —el que tiene GL, el que de verdad se audita— la
+        # corrección ni siquiera corre: `_lo_subido_manda` la apaga, que es la
+        # regla del owner de no tocar lo que ya viene cargado.
         mensual = await _monthly_results(session, escenario)
-        del_mes = next((m for m in mensual if m["month"] == mes), None)
-        lineas_motor = {l.line_code: l for l in (del_mes or {}).get("lines", [])}
+        del_periodo = [m for m in mensual if m["month"] in set(meses)]
+        agregado = _aggregate_selected(
+            del_periodo,
+            lo_subido_manda=await _lo_subido_manda(session, escenario),
+            ebt_anual=_ebt_anual(mensual),
+            renta_digitada=await _renta_digitada(session, escenario))
+        lineas_motor = {l["line_code"]: l for l in agregado["lines"]}
 
         # Los renglones DERIVADOS quedan afuera: el bloque de Operating Profit
         # es ingreso menos gasto, no se compone de asientos, y su «detalle»
@@ -493,7 +566,7 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
                                "detalle": None, "dif": None})
                 continue
 
-            motor = sum((Decimal(str(lineas_motor[c].amount_usd))
+            motor = sum((Decimal(str(lineas_motor[c]["amount_usd"]))
                          for c in codigos if c in lineas_motor), CERO)
 
             # Un TOTAL o SUBTOTAL no tiene detalle propio: es la suma de otros
@@ -582,7 +655,7 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         # el Resumen 12m y el P&L diferían en los $1.121,36 de lavandería.
         def _linea(code: str) -> Decimal:
             fila = lineas_motor.get(code)
-            return Decimal(str(fila.amount_usd)) if fila else CERO
+            return Decimal(str(fila["amount_usd"])) if fila else CERO
 
         ingresos = _linea("TOTAL_REVENUES")
         neto = _linea("NET_PROFIT")
@@ -620,7 +693,7 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
         if not n_con_monto:
             avisos.append(
                 "Este escenario no tiene detalle por cuenta cargado para el "
-                "mes: ni asientos del mayor, ni líneas digitadas en los "
+                "período: ni asientos del mayor, ni líneas digitadas en los "
                 "checkbooks con su cuenta contable.")
         elif del_checkbook:
             # ⚠️ Se DICE de dónde salió. El detalle de un presupuesto no es un
@@ -666,6 +739,12 @@ async def auditoria_del_mes(scenario_id: str, mes: int):
             "escenario": f"{escenario.type} {escenario.version} {escenario.year}",
             "year": escenario.year,
             "mes": mes,
+            # ⚠️ El ámbito viaja DE VUELTA. La pantalla ya lo sabe, pero un
+            # reporte que no dice qué período audita es un reporte que, bajado
+            # a Excel, no se puede volver a leer dentro de un mes.
+            "horizonte": horizonte,
+            "meses": meses,
+            "periodo": _rotulo_periodo(mes, horizonte),
             "detalle": detalle,
             "cuadre": cuadre,
             "departamentos": departamentos,
