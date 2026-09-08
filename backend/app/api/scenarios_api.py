@@ -2153,6 +2153,9 @@ async def import_gl_detail(
             con = consolidados[idx_blk]
         else:
             con = {"lines": {}, "stats": {}}
+        # Los socios del Club no pasan por el consolidado del P&L —no son plata—
+        # asi que se toman del bloque tal como los recogio el importador.
+        membresias = blk.get("membresias") or {}
         touched = sorted({mi for key in ("revenue", "opex", "costs", "belowgop", "payroll")
                           for r in blk.get(key, []) for mi in r["months"].keys()})
         # La llave lleva el OUTLET: el GL de A&B trae la misma cuenta una vez por
@@ -2264,6 +2267,31 @@ async def import_gl_detail(
                 occupancy_pct=s.get("occupancy_pct", Decimal("0")),
                 adr=s.get("adr", Decimal("0")),
             ))
+        # Los socios del Club Madresal que trajo el archivo.
+        #
+        # Owner, 2026-09-08: «el upload debe tener estas lineas para poder subir
+        # estas estadisticas». Van a su propia tabla: son un conteo, no plata, y
+        # su total anual es el saldo de diciembre y no la suma de los meses.
+        #
+        # ⚠️ Solo se BORRA el mes que el archivo trae. Un archivo que no incluya
+        # las lineas de socios no puede dejar en cero un conteo que ya estaba —
+        # es el mismo criterio que el merge usa para todo lo demas.
+        if membresias:
+            meses_socios = sorted({mi for porMes in membresias.values()
+                                   for mi in porMes})
+            await db.execute(sa_delete(ClubMembershipStat).where(
+                ClubMembershipStat.scenario_id == target.id,
+                ClubMembershipStat.month.in_(meses_socios)))
+            for mi_ in meses_socios:
+                db.add(ClubMembershipStat(
+                    scenario_id=target.id, month=mi_,
+                    total=int(membresias.get("total", {}).get(mi_, 0) or 0),
+                    condicionados=int(
+                        membresias.get("condicionados", {}).get(mi_, 0) or 0),
+                    pagando=int(membresias.get("pagando", {}).get(mi_, 0) or 0),
+                    acuerdo_pago=int(
+                        membresias.get("acuerdo_pago", {}).get(mi_, 0) or 0),
+                ))
         target.source_mode = "imported"
         # Los meses de ACTUAL que trae este archivo, para mover el corte del
         # forecast al final. Solo cuentan los que tienen alguna cifra.
@@ -2811,8 +2839,38 @@ async def export_scenario_detail(
             if v is not None:
                 verif.setdefault(ctrl.codigo, {})[m] = v
 
+    # ── Los socios del Club Madresal ────────────────────────────────────────
+    #
+    # Owner, 2026-09-08: «el upload debe tener estas lineas para poder subir
+    # estas estadisticas».
+    #
+    # ⚠️ Solo si el 260 esta habilitado. El owner aviso que el Club se va el dia
+    # que se opere por fuera del hotel; ese dia se desmarca en Provisionamiento
+    # y estas cuatro filas desaparecen solas, sin tocar codigo. En una propiedad
+    # que no opera Club, `membresias_tpl` queda vacio y las filas no se dibujan.
+    from app.models.club_membership_stat import ClubMembershipStat
+    from app.models.dept_enablement import DeptEnablement
+    membresias_tpl: dict = {}
+    apagado = (await db.execute(select(DeptEnablement).where(
+        DeptEnablement.hotel_id == scen.hotel_id,
+        DeptEnablement.scope_key == "260",
+        DeptEnablement.enabled.is_(False)))).scalars().first()
+    club_activo = apagado is None and "260" in dept_names
+    if club_activo:
+        for cm in (await db.execute(select(ClubMembershipStat).where(
+                ClubMembershipStat.scenario_id == scenario_id))).scalars():
+            if cm.month in months:
+                membresias_tpl[(label, cm.month)] = {
+                    "total": cm.total, "condicionados": cm.condicionados,
+                    "pagando": cm.pagando, "acuerdo_pago": cm.acuerdo_pago}
+        # Sin dato todavia, las filas igual se ofrecen: la plantilla existe para
+        # digitar lo que aun no esta. Con el diccionario vacio no se dibujarian.
+        if not membresias_tpl:
+            membresias_tpl = {(label, m): {} for m in months}
+
     xls = build_detail_workbook([label], list(accts.values()), stats, dept_names,
-                                verificacion={label: verif})
+                                verificacion={label: verif},
+                                membresias=membresias_tpl)
     scope = f"m{month:02d}" if month else "full"
     fn = f"{hotel_slug()}_Detalle_{scen.type}_{scen.version}_{scen.year}_{scope}.xlsx".replace(" ", "-")
     return Response(content=xls,

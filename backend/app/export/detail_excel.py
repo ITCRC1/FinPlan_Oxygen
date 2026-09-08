@@ -46,6 +46,18 @@ STAT_ROWS = [("9010", "Rooms disponibles", "rooms_available"),
              ("9020", "Rooms ocupadas", "rooms_occupied"),
              ("9060", "Huéspedes", "guests")]
 
+#: Los socios del Club Madresal (owner, 2026-09-08). Salen de una tabla propia
+#: —`ClubMembershipStat`— y no de `ScenarioStat`, por eso van en su propia lista.
+#:
+#: ⚠️ **Se ofrecen sólo si el departamento 260 está habilitado**, no con un `if`
+#: por hotel. Es la misma regla que ya rige al Club en toda la app: el owner
+#: avisó que esto se va el día que el Club se opere por fuera, y ese día se
+#: desmarca en Provisionamiento y se apaga solo, sin tocar código.
+MEMBRESIA_ROWS = [("9800", "Total membresías", "total"),
+                  ("9801", "Membresías condicionados", "condicionados"),
+                  ("9802", "Membresías pagando", "pagando"),
+                  ("9803", "Membresías en acuerdo de pago", "acuerdo_pago")]
+
 
 
 
@@ -169,13 +181,15 @@ def _escribir_verificacion(det, bmc: dict, verificacion: dict, nmeta: int) -> No
 
 def build_detail_workbook(dest_labels: list[str], accts: list[dict],
                           stats: dict[tuple, dict], dept_names: dict[str, str],
-                          verificacion: dict | None = None) -> bytes:
+                          verificacion: dict | None = None,
+                          membresias: dict[tuple, dict] | None = None) -> bytes:
     """dest_labels: rótulos de bloque en orden. accts: [{clase,grupo,dept_code,cuenta,
     nombre, vals:{(label,mes):monto}}]. stats: {(label,mes):{campo:valor}}.
     verificacion: {label: {codigo_control: {mes: monto}}} — el bloque de control
     de arriba. Si viene vacío el bloque sale igual, pero en blanco: la plantilla
     tiene que ofrecer dónde escribirlo aunque el sistema todavía no tenga el
     número (que es el caso de una propiedad que arranca desde cero)."""
+    membresias = membresias or {}
     wb = Workbook(); det = wb.active; det.title = "Detalle"
     HDR = PatternFill("solid", fgColor="16402A"); WHITE = Font(bold=True, color="FFFFFF", size=10)
     STATF = PatternFill("solid", fgColor="FFF3CD"); DEPTF = PatternFill("solid", fgColor="EAF1EC")
@@ -210,6 +224,21 @@ def build_detail_workbook(dest_labels: list[str], accts: list[dict],
                 v = stats.get((blk, m), {}).get(field)
                 if v is not None:
                     cc = det.cell(r, bmc[(blk, m)], round(float(v), 2)); cc.number_format = "#,##0"
+        for j in range(1, NMETA + 1):
+            det.cell(r, j).fill = STATF
+        r += 1
+    # Los socios del Club, si esta propiedad lo opera. `membresias` llega vacío
+    # cuando el 260 no está habilitado, y entonces estas filas no se dibujan.
+    for code, label, field in MEMBRESIA_ROWS:
+        if not membresias:
+            break
+        det.cell(r, 1, "Stat"); det.cell(r, 2, "KPI"); det.cell(r, 3, "Estadísticas")
+        det.cell(r, 4, code); det.cell(r, 5, label)
+        for blk in dest_labels:
+            for m in range(1, 13):
+                v = membresias.get((blk, m), {}).get(field)
+                if v is not None:
+                    cc = det.cell(r, bmc[(blk, m)], int(v)); cc.number_format = "#,##0"
         for j in range(1, NMETA + 1):
             det.cell(r, j).fill = STATF
         r += 1

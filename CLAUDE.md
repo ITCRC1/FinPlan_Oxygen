@@ -4127,6 +4127,7 @@ Las cuentas 9xxx son cuentas **no financieras** — registran volúmenes y canti
 | **9500–9503** | STATS Transport | Número de clientes de transporte | 0152 | Transport utilization |
 | **9600–9603** | STATS Innoceana | Número de lecciones y PAX | 0155 | Innoceana utilization |
 | **9700–9702** | STATS Kilos | Kilos lavados por departamento (Rooms, F&B, Spa) | 0160 | **Base para allocation de Lavandería** |
+| **9800–9803** | STATS Socios | Socios del Club Madresal: total, condicionados, pagando, en acuerdo de pago | 260 | Explican la cuota de `REV_CLUB`. **No aditivos**: el total del año es el saldo de diciembre |
 | **9980–9985** | STATS Horas | Horas regulares, extras, libres, feriados, vacaciones por posición | todos | Control de planilla vs Budget |
 
 ### 18.2 Detalle 9000 — Noches por segmento de mercado

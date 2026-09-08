@@ -65,7 +65,7 @@ def test_los_rangos_documentados_se_respetan():
     sistema y la documentación diciendo cosas distintas."""
     from app.seed_stats import leer_catalogo
     grupos_validos = {"9000", "9110", "9201", "9400", "9500", "9600", "9700",
-                      "9900", "9980"}
+                      "9800", "9900", "9980"}
     for c in leer_catalogo():
         assert c["grupo"] in grupos_validos, (
             f"{c['code']} declara el grupo {c['grupo']}, que no está en "
