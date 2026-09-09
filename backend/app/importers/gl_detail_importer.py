@@ -682,49 +682,51 @@ def consolidate_block(blk: dict, mappings: list[dict], report_lines: list[dict],
         if avail and occ:
             d["occupancy_pct"] = Decimal(str(occ)) / Decimal(str(avail))
         if occ:
-            # ADR = renta de habitación / ocupadas. REGLA por año (confirmado por el
-            # owner): 2026 en adelante = SOLO la cuenta "Rooms" (excluye No Show,
-            # Cancellations, otros ingresos del depto). EXCEPCIÓN histórica: ene-2024 a
-            # dic-2025 quedó sobre TODO el revenue del depto Rooms — se respeta tal cual.
-            year = blk.get("year") or 0
-            # Budget también va sobre el total: solo se presupuesta rooms revenue puro
-            # (el depto = Rooms puro). 2024-2025 = histórico sobre el depto.
-            whole_dept = year <= 2025 or blk.get("type") == "BUDGET"
-            if whole_dept:
+            # ADR = renta de habitación / ocupadas.
+            #
+            # ⚠️ SIEMPRE la cuenta 4000, en todo año y toda versión.
+            #
+            # Owner, 2026-09-08: «el ADR debe ser siempre con la cuenta 4000,
+            # rooms only». Antes había dos reglas: hasta 2025 —y en todo
+            # BUDGET— se calculaba sobre TODO el ingreso del departamento
+            # Rooms, y de 2026 en adelante solo sobre la cuenta de Rooms.
+            # Un mismo indicador calculado de dos formas segun el año hace que
+            # la serie no se pueda comparar consigo misma, que es justo para lo
+            # que sirve un ADR.
+            #
+            # ⚠️ Y se identifica por CODIGO, no por nombre. Esto comparaba
+            # `account_name.lower() == "rooms"`, y funcionó mientras el archivo
+            # del owner rotulara así esa fila. Al pasar a la plantilla que
+            # genera el app, la fila se llamó «Room Revenue» —el nombre canonico
+            # del mapeo—, la suma dio CERO, y el ADR y el RevPAR quedaron en
+            # blanco en los cinco meses del ACTUAL 2026 sin que nada avisara: el
+            # P&L cuadra igual porque ninguna linea depende de ellos.
+            #
+            # El nombre ya había cambiado tres veces en esta misma cuenta
+            # («Cancellations» en 2024, «No Show» en 2025, «Rooms» en el Budget
+            # 2026 Final): es el dato menos estable del archivo.
+            #
+            # La 4001 (Cancellations) y la 4002 (No Show) quedan fuera: son
+            # ingreso del departamento, pero no renta de habitación vendida.
+            rooms_rev = sum(
+                (Decimal(str(v)) for r in blk.get("revenue", [])
+                 for mm, v in r["months"].items()
+                 if mm == m and str(r.get("account_code") or "").strip() == CUENTA_ADR
+                 and pl_engine.group_for_dept(r["dept_code"]) == "ROOMS"),
+                Decimal(0))
+            if not rooms_rev:
+                # Respaldo para un archivo viejo SIN número de cuenta en esa
+                # fila: el criterio por nombre. Es peor criterio —el nombre lo
+                # pone el archivo— pero es mejor que un cero, que se lee como
+                # «no hubo tarifa» en vez de «no supe calcularla».
                 rooms_rev = sum(
                     (Decimal(str(v)) for r in blk.get("revenue", [])
                      for mm, v in r["months"].items()
-                     if mm == m and pl_engine.group_for_dept(r["dept_code"]) == "ROOMS"),
+                     if mm == m
+                     and not str(r.get("account_code") or "").strip()
+                     and (r.get("account_name") or "").strip().lower() == "rooms"
+                     and pl_engine.group_for_dept(r["dept_code"]) == "ROOMS"),
                     Decimal(0))
-            else:
-                # ⚠️ Se elige por CÓDIGO de cuenta (`4000`), no por nombre.
-                #
-                # Antes comparaba `account_name == "rooms"`, y el nombre lo pone el
-                # archivo: en el mayor de Oxygen la 4000 se llama «Room Revenue», así
-                # que no hacía match, `rooms_rev` quedaba en cero y **el ADR nunca se
-                # escribía**. Medido en producción el 2026-09-05: el ACTUAL 2026 tenía
-                # los siete meses con ingreso y noches cargados y el ADR en 0,00,
-                # mientras el 2025 —que va por la rama del departamento— estaba bien.
-                #
-                # El nombre ya había cambiado tres veces en esta misma cuenta
-                # («Cancellations» en 2024, «No Show» en 2025, «Rooms» en el Budget
-                # 2026 Final): es el dato menos estable del archivo. El código es el
-                # que fija A4 (`docs/PENDIENTES.md`), y es el que excluye No Show y
-                # Cancellations, que viven en la 4002 y la 4001.
-                rooms_rev = sum(
-                    (Decimal(str(v)) for r in blk.get("revenue", [])
-                     for mm, v in r["months"].items()
-                     if mm == m and (r.get("account_code") or "").strip() == CUENTA_ADR),
-                    Decimal(0))
-                if not rooms_rev:
-                    # Respaldo para un archivo sin número de cuenta en esa fila: el
-                    # criterio viejo, por nombre. Es peor, pero es mejor que un cero.
-                    rooms_rev = sum(
-                        (Decimal(str(v)) for r in blk.get("revenue", [])
-                         for mm, v in r["months"].items()
-                         if mm == m
-                         and (r.get("account_name") or "").strip().lower() == "rooms"),
-                        Decimal(0))
             if rooms_rev:
                 d["adr"] = rooms_rev / Decimal(str(occ))
         stats[m] = d
