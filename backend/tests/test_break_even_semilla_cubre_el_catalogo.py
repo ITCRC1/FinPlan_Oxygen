@@ -147,3 +147,52 @@ def test_solo_el_impuesto_de_renta_queda_fuera_del_equilibrio(semilla):
                  if str(c["excluded_from_be"]).strip().lower() in ("true", "1")}
     assert excluidas <= {"INCOME_TAXES"}, (
         f"hay filas excluidas del equilibrio que no son el impuesto: {excluidas}")
+
+
+# ── Los departamentos que esta propiedad NO opera ────────────────────────────
+
+#: Owner, 2026-09-08, sobre Innoceana, Crowther Lab y Claro del Bosque: *«haz lo
+#: mismo»* —confirmando para Oxygen lo que ya había dicho de Amarena: no se
+#: operan, se pueden esconder—.
+#:
+#: Estaban en el catálogo porque `orden_plantilla.json` resultó ser **byte por
+#: byte el de Corcovado** en las cuatro propiedades: es la plantilla del grupo,
+#: no una medición de este hotel. Medido en producción antes de apagarlos: los
+#: tres con CERO asientos, así que esconderlos no movió ningún número.
+NO_SE_OPERAN = {
+    "innoceana": "0155",
+    "crowther-lab": "0156",
+    "claro-huerta": "0205",
+}
+
+
+def test_los_departamentos_que_no_se_operan_no_estan_activos():
+    """⚠️ La semilla se REGENERA. Sin esta guarda, la próxima corrida los
+    volvería a marcar `active` —salen del catálogo del grupo, que sigue
+    trayéndolos— y reaparecerían en el punto de equilibrio sin que nadie lo
+    pidiera.
+    """
+    deptos, _clases = leer(HOTEL_ID)
+    por_slug = {d["slug"]: d for d in deptos}
+    for slug, dept in NO_SE_OPERAN.items():
+        assert slug in por_slug, f"{slug} desapareció de la semilla"
+        assert por_slug[slug]["status"] != "active", (
+            f"{slug} ({dept}) volvió a quedar activo: el owner dijo que esta "
+            f"propiedad no lo opera")
+
+
+def test_pero_sus_reglas_NO_se_borran():
+    """⚠️ Se esconden, no se eliminan.
+
+    La fila del departamento y sus reglas de clasificación son lo que le da
+    departamento a un movimiento futuro. Sin ellas, un asiento de esa cuenta
+    caería por descarte en `OPEX_ROOMS` **sin mover ningún total y sin avisar**
+    — que es exactamente el error que costó encontrar 1.361,29 al año en esta
+    propiedad.
+    """
+    _deptos, clases = leer(HOTEL_ID)
+    for slug, dept in NO_SE_OPERAN.items():
+        n = sum(1 for c in clases if c["dept_code"] == dept)
+        assert n > 0, (
+            f"se borraron las reglas de {slug} ({dept}): esconder un "
+            f"departamento no es eliminarlo del catálogo")
