@@ -41,6 +41,15 @@ from app.i18n import DEFAULT_LOCALE, normalize_locale
 #: mano — y con tres redacciones distintas entre ellos.
 MENSAJES: dict[str, dict[str, str]] = {
     # ── Lo que no se encuentra ────────────────────────────────────────────────
+    "break_even.archivo_ilegible": {
+        "es": "No se pudo abrir el archivo. Tiene que ser el .xlsx que baja esta misma pantalla, guardado en formato Excel.",
+        "en": "The file could not be opened. It must be the .xlsx this screen downloads, saved in Excel format."},
+    "break_even.archivo_vacio": {
+        "es": "El archivo llegó vacío: no trae ninguna hoja con datos.",
+        "en": "The file arrived empty: it has no sheet with data."},
+    "break_even.sin_encabezado": {
+        "es": "El archivo no tiene el encabezado de la plantilla: faltan las columnas «id» y «% Variable». Bajá la plantilla de nuevo y llenala sobre ese archivo.",
+        "en": "The file is missing the template header: columns «id» and «% Variable» are not there. Download the template again and fill that file in."},
     "escenario.no_encontrado": {
         "es": "Escenario no encontrado",
         "en": "Scenario not found"},
