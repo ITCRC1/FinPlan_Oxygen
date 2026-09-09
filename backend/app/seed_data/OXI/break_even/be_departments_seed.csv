@@ -1,0 +1,19 @@
+slug,name,display_order,generates_revenue,dept_codes,status
+rooms,Rooms,1,true,0110,active
+fb,F&B,2,true,0120,active
+spa,Spa,3,true,0140,active
+tours,Tours,4,true,0150,active
+gift-shop,Gift Shop,5,true,0165,active
+transportation,Transportation,6,true,0152,active
+laundry,Laundry,7,true,"0161,0162",active
+miscelaneos,Misceláneos,8,true,280,active
+ag,A&G,9,false,"0180,0181",active
+sales-marketing,Sales & Marketing,10,false,0190,active
+maintenance,Maintenance,11,false,0200,active
+information-system,Information System,12,false,0230,active
+utility,Utility,13,false,0210,active
+cafeteria,Cafetería,14,false,0220,active
+property-expenses,Property Expenses,15,false,0250,active
+innoceana,Innoceana,16,true,0155,pending_classification
+crowther-lab,Crowther Lab,17,true,0156,pending_classification
+claro-huerta,Claro del Bosque (Huerta),18,false,0205,pending_classification

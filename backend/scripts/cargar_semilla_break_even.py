@@ -26,9 +26,9 @@ escribir. Una carga que empieza escribiendo no tiene vuelta atrás.
 
 ## Lo que este cargador NO hace
 
-No calcula ni recalcula nada. Las semillas son datos reales de CWL, ya mapeados
-y validados contra el P&L al centavo — el spec dice literalmente «no regenerarlos
-ni recalcularlos: se cargan tal cual».
+No calcula ni recalcula nada. Las semillas son datos ya mapeados y validados
+contra el P&L de SU propiedad — el spec dice literalmente «no regenerarlos ni
+recalcularlos: se cargan tal cual».
 """
 from __future__ import annotations
 
@@ -42,11 +42,21 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 #: Dónde viven las semillas dentro del repo.
 def _carpeta_de_la_propiedad() -> pathlib.Path:
-    """La carpeta de ESTA instalacion. Sin `HOTEL_ID`, la de Corcovado."""
-    import os
-    hotel = os.getenv("HOTEL_ID", "CWL")
+    """La carpeta de ESTA instalacion, la misma que lee el arranque.
+
+    ⚠️ **El default sale de `app.hotel_actual`, no de un literal.** Antes decía
+    `os.getenv("HOTEL_ID", "CWL")`: en un despliegue de Oxygen sin la variable
+    en el entorno, este script cargaba **la semilla de Corcovado** —otros
+    departamentos, otros porcentajes— y no fallaba, porque esa carpeta existe.
+    Una clasificación ajena no se ve como un error: se ve como un punto de
+    equilibrio.
+
+    Es la misma razón por la que `app/hotel_actual.py` existe y por la que su
+    default es la propiedad de ESTA instalación y no la de al lado.
+    """
+    from app.hotel_actual import HOTEL_ID
     return (pathlib.Path(__file__).resolve().parents[1]
-            / "app" / "seed_data" / hotel / "break_even")
+            / "app" / "seed_data" / HOTEL_ID / "break_even")
 
 
 #: ATENCION (2026-08-20): las semillas se movieron a
