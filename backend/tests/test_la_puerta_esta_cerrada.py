@@ -280,19 +280,40 @@ def test_el_bootstrap_toma_un_candado():
 # La migración
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_la_migracion_137_es_la_cabeza_y_es_reversible():
-    mig = RAIZ / "alembic" / "versions" / "137_freno_al_login_y_registro_de_puerta.py"
-    assert mig.exists(), "falta la migración del freno al login"
-    texto = mig.read_text(encoding="utf-8")
-    assert 'down_revision = "136"' in texto
+def test_la_migracion_del_freno_existe_y_es_reversible():
+    """⚠️ Se busca por NOMBRE, no por numero.
+
+    Antes esta guarda exigia el archivo `137_...` exacto, y el numero no es el
+    mismo en todas las instalaciones: cada una fue agregando sus migraciones en
+    otro orden, asi que el mismo cambio es la 137 en una y la 138 en otra.
+    Atarse al numero hacia fallar a una instalacion que TIENE la migracion,
+    solo que numerada distinto — un rojo que no dice nada del sistema.
+
+    Lo que de verdad importa es que exista, que encadene con la anterior, y que
+    sepa volver atras.
+    """
+    versiones = RAIZ / "alembic" / "versions"
+    candidatas = sorted(versiones.glob("*_freno_al_login_y_registro_de_puerta.py"))
+    assert candidatas, "falta la migración del freno al login"
+    assert len(candidatas) == 1, "hay dos copias de la misma migración: %s" % candidatas
+    texto = candidatas[0].read_text(encoding="utf-8")
+    # Encadenada con la anterior, sea cual sea su numero.
+    import re
+    m = re.search(r'^down_revision = "(\d+)"$', texto, re.M)
+    assert m, "la migración no dice de cuál cuelga"
+    anterior = m.group(1)
+    assert sorted(versiones.glob("%s_*.py" % anterior)), (
+        "cuelga de la %s, que no existe: alembic tendría un hueco" % anterior)
     assert "def downgrade" in texto
     for col in ("failed_attempts", "locked_until", "last_failed_at"):
         assert col in texto
     assert "auth_events" in texto
 
-    # Nadie más puede colgar de la 136: dos cabezas rompen `alembic upgrade head`
-    # en el arranque, que es como se despliega.
-    versiones = RAIZ / "alembic" / "versions"
+    # Nadie más puede colgar del MISMO padre: dos hijas son dos cabezas, y dos
+    # cabezas rompen `alembic upgrade head` en el arranque, que es como se
+    # despliega. El padre se lee de la propia migración —no se escribe acá— por
+    # la misma razón por la que el archivo se busca por nombre.
     hijas = [p.name for p in versiones.glob("*.py")
-             if 'down_revision = "136"' in p.read_text(encoding="utf-8")]
-    assert hijas == [mig.name], f"hay más de una migración sobre la 136: {hijas}"
+             if 'down_revision = "%s"' % anterior in p.read_text(encoding="utf-8")]
+    assert hijas == [candidatas[0].name], (
+        "hay más de una migración sobre la %s: %s" % (anterior, hijas))
