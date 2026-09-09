@@ -77,6 +77,7 @@ def kpis_de_habitaciones(
     rooms_occupied,
     guests,
     ingreso_habitaciones=None,
+    ingreso_total=None,
     adr_guardado=None,
     occupancy_guardada=None,
 ) -> dict:
@@ -115,7 +116,18 @@ def kpis_de_habitaciones(
         "guests": _f(guests),
         "occupancy_pct": occupancy,
         "adr": adr,
-        # RevPAR = ADR × ocupación. Ver el encabezado: mantiene la identidad aun
-        # cuando el ADR cayó al guardado.
-        "revpar": (adr * ocup / disp) if disp else 0.0,
+        # ⚠️ RevPAR = ingreso TOTAL / disponibles (owner, 2026-09-08: «revpar
+        # es total revenue per available room» · «total revenue by total rooms
+        # available»).
+        #
+        # Era `ADR × ocupación`, y estaba puesto asi a proposito, «para
+        # mantener la identidad aun cuando el ADR cayó al guardado». El owner
+        # cambió la definición: mide cuánto rinde cada habitación disponible con
+        # TODO lo que el hotel factura —spa, tours, A&B—, no sólo la noche.
+        #
+        # Sin `ingreso_total` NO se cae al ingreso de habitaciones: eso daría un
+        # número con el nombre del nuevo y el valor del viejo, que es la peor de
+        # las dos cosas. Se devuelve cero, y quien tenga el ingreso total lo
+        # pasa — el P&L siempre lo tiene.
+        "revpar": (_f(ingreso_total) / disp) if disp else 0.0,
     }

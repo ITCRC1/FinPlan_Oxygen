@@ -92,7 +92,28 @@ def _kpis(r) -> dict:
     }
 
 
-def _kpis_from_stat(s: ScenarioStat, ingreso_habitaciones=None) -> dict:
+#: ⚠️ **RevPAR = ingreso TOTAL / habitaciones disponibles** (owner, 2026-09-08:
+#: «revpar es total revenue per available room» · «total revenue by total rooms
+#: available»).
+#:
+#: Antes era `ADR × ocupación`, o sea ingreso DE HABITACIONES por habitación
+#: disponible, y estaba puesto a propósito «para que sea coherente con la tarifa
+#: que se muestra al lado».
+#:
+#: El owner cambió la definición: mide cuánto rinde cada habitación disponible
+#: con TODO lo que el hotel factura —spa, tours, A&B incluidos—, no sólo la
+#: noche. Es lo que en la literatura se llama TRevPAR, y el módulo de punto de
+#: equilibrio ya lo calculaba así (`be_trevpar`).
+#:
+#: ⚠️ Se pierde la identidad `RevPAR = ADR × occ/avail`. Es deliberado: ya no
+#: son el mismo indicador, y por eso el de HABITACIONES sigue publicado aparte
+#: como `revpar_bruto` en vez de desaparecer.
+def _revpar(total_revenue: float, rooms_available: float) -> float:
+    return (float(total_revenue) / float(rooms_available)) if rooms_available else 0.0
+
+
+def _kpis_from_stat(s: ScenarioStat, ingreso_habitaciones=None,
+                    ingreso_total: float = 0.0) -> dict:
     """KPIs a partir de una fila de `ScenarioStat`.
 
     Las NOCHES salen siempre de la fila (decisión del 2026-08-17: mandan
@@ -109,6 +130,7 @@ def _kpis_from_stat(s: ScenarioStat, ingreso_habitaciones=None) -> dict:
         rooms_occupied=s.rooms_occupied,
         guests=s.guests,
         ingreso_habitaciones=ingreso_habitaciones,
+        ingreso_total=ingreso_total,
         adr_guardado=s.adr,
         occupancy_guardada=s.occupancy_pct,
     )
@@ -198,6 +220,10 @@ async def _monthly_results(session, scenario) -> list[dict]:
     out = []
     for month in range(1, 13):
         lines = await recalc.compute_pl_month(session, scenario, month, revenue_results)
+        # El ingreso TOTAL del mes, que es de donde sale el RevPAR.
+        ingreso_mes = next(
+            (float(getattr(l, "amount_usd", 0) or 0) for l in lines
+             if getattr(l, "line_code", "") == "TOTAL_REVENUES"), 0.0)
         # Ingreso PURO de habitaciones del mes, para derivar el ADR al leer en vez
         # de arrastrar el que quedó guardado en el último Recalcular. Es
         # `RevenueResult.rooms` —la tarifa, que nunca pasó por las cuentas—, NO la
@@ -210,9 +236,11 @@ async def _monthly_results(session, scenario) -> list[dict]:
                        else None)
         ingreso_hab = getattr(ingreso_hab, "rooms", None) if ingreso_hab else None
         if through >= month and month in actual_stat_kpis:
-            kpis = _kpis_from_stat(actual_stat_kpis[month])
+            kpis = _kpis_from_stat(actual_stat_kpis[month],
+                                   ingreso_total=ingreso_mes)
         elif month in stat_kpis:
-            kpis = _kpis_from_stat(stat_kpis[month], ingreso_hab)
+            kpis = _kpis_from_stat(stat_kpis[month], ingreso_hab,
+                                   ingreso_total=ingreso_mes)
         else:
             kpis_src = hist_kpis.get(month) if is_actual else (
                 revenue_results[month] if revenue_results else None)
@@ -440,9 +468,8 @@ def _aggregate_selected(sel: list[dict], *, lo_subido_manda: bool = False,
         "guests": guests,
         "occupancy_pct": (occ / avail) if avail else 0.0,
         "adr": adr,
-        # Mismo criterio que `_kpis_from_stat`: RevPAR = ADR × ocupación. Dejarlo
-        # sobre REV_ROOMS rompería la identidad RevPAR = ADR × occ/avail.
-        "revpar": (adr * occ / avail) if avail else 0.0,
+        # RevPAR = ingreso TOTAL / disponibles. Ver `_revpar`.
+        "revpar": _revpar(amounts.get("TOTAL_REVENUES", 0.0), avail),
     }
 
     # ── Club Madresal: socios pagando y cuota promedio ───────────────────────
@@ -714,12 +741,8 @@ async def get_estadisticas(scenario_id: str, desde: int = 1, hasta: int = 12):
             "rooms_revenue": rooms_rev,
             "adr": adr,
             "adr_derivado": (rooms_rev / occ) if occ else 0.0,
-            # ⚠️ El RevPAR sale del ADR **de las estadísticas**, no del ingreso
-            # bruto: tiene que ser coherente con la tarifa que se muestra al
-            # lado. Julio 2026 lo hace evidente — con el ingreso completo daba
-            # $73,02 y con la tarifa depurada da $67,98, y los $5,04 de
-            # diferencia son los mismos $2.500 que no son noche vendida.
-            "revpar": (adr * occ / avail) if avail else 0.0,
+            # RevPAR = ingreso TOTAL / disponibles. Ver `_revpar`.
+            "revpar": _revpar(linea("TOTAL_REVENUES"), avail),
             "revpar_bruto": (rooms_rev / avail) if avail else 0.0,
             # `None` —no cero— cuando la propiedad no tiene Club: un cero se lee
             # como «no hay socios» donde en realidad no hay Club.

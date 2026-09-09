@@ -67,20 +67,38 @@ def test_la_ocupacion_sale_de_las_noches_aunque_la_columna_diga_otra_cosa():
     assert k["occupancy_pct"] == 0.5
 
 
-def test_se_mantiene_la_identidad_revpar_igual_adr_por_ocupacion():
-    """RevPAR = ADR × ocupación, también cuando el ADR cayó al guardado.
+def test_el_revpar_sale_del_ingreso_TOTAL_y_ya_no_de_la_identidad():
+    """⚠️ **La identidad `RevPAR = ADR × ocupación` se rompió A PROPÓSITO.**
 
-    Si el RevPAR se derivara del ingreso mientras el ADR viene del guardado, los
-    tres números no cerrarían entre ellos y la pantalla se contradiría sola.
+    Owner, 2026-09-08: *«revpar es total revenue per available room»* · *«total
+    revenue by total rooms available»*. Esta prueba comprobaba lo contrario —que
+    los tres números cerraran entre ellos— y tenía razón mientras el RevPAR
+    midiera ingreso DE HABITACIONES. Ahora mide todo lo que el hotel factura, así
+    que ya no son el mismo indicador y no tienen por qué cerrar.
     """
-    for ingreso, guardado in ((Decimal("100000"), Decimal("400")),
-                              (None, Decimal("477.34"))):
-        k = kpis_de_habitaciones(
-            rooms_available=300, rooms_occupied=Decimal("200"), guests=Decimal("380"),
-            ingreso_habitaciones=ingreso, adr_guardado=guardado,
-        )
-        esperado = k["adr"] * k["occupancy_pct"]
-        assert abs(k["revpar"] - esperado) < 1e-9, (ingreso, k)
+    k = kpis_de_habitaciones(
+        rooms_available=300, rooms_occupied=Decimal("200"), guests=Decimal("380"),
+        ingreso_habitaciones=Decimal("100000"), ingreso_total=Decimal("180000"),
+    )
+    assert k["adr"] == 500.0                     # 100.000 / 200 noches
+    assert k["revpar"] == 600.0                  # 180.000 / 300 disponibles
+    # Y NO la identidad vieja, que aquí habría dado 333,33.
+    assert abs(k["revpar"] - k["adr"] * k["occupancy_pct"]) > 1
+
+
+def test_sin_ingreso_total_el_revpar_da_CERO_y_no_el_numero_viejo():
+    """⚠️ El respaldo NO cae al ingreso de habitaciones.
+
+    Sería un número con el nombre del indicador nuevo y el valor del viejo, que
+    es peor que no tenerlo: un cero se lee como «falta el dato», y un RevPAR
+    calculado con la fórmula anterior se lee como un RevPAR.
+    """
+    k = kpis_de_habitaciones(
+        rooms_available=300, rooms_occupied=Decimal("200"), guests=Decimal("380"),
+        ingreso_habitaciones=Decimal("100000"),
+    )
+    assert k["adr"] == 500.0        # el ADR sí se deriva
+    assert k["revpar"] == 0.0
 
 
 def test_un_mes_cerrado_no_revienta():
