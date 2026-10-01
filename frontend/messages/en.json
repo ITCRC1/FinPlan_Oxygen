@@ -4314,5 +4314,6 @@
       "laVersionLargaDeEstosKpi": "The long-form version of these same KPIs",
       "elDetalleOperativo": "The same KPIs with the operational detail"
     }
-  }
+  },
+  "planningReport": "Planning Report (12 months · year)"
 }
