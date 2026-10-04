@@ -203,8 +203,15 @@ export default function FbPlanPage() {
       </p>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+        {/* ⚠️ Ancho mínimo explícito. Sin él el selector se encoge hasta
+            mostrar «BUDG…» y no se sabe en cuál escenario se está: el 2026 de
+            esta propiedad abre en JUNIO y el 2027 tiene pax los doce meses, así
+            que los cinco ceros de arriba se leen como un defecto del cálculo
+            cuando son el presupuesto correcto del año equivocado. Pasó el
+            2026-10-03, a los diez minutos de publicar la pantalla. */}
         <select className="fin-input" value={scenarioId}
-          onChange={e => setScenarioId(e.target.value)} style={{ padding: "6px 10px", fontSize: 13 }}>
+          onChange={e => setScenarioId(e.target.value)}
+          style={{ padding: "6px 10px", fontSize: 13, minWidth: 230, fontWeight: 600 }}>
           {scenarios.map(s => (
             <option key={s.id} value={s.id}>{s.type} {s.version} {s.year}</option>
           ))}
@@ -213,8 +220,11 @@ export default function FbPlanPage() {
         <button onClick={guardar} disabled={!dirty || saving || bloqueado} style={btn(dirty && !saving && !bloqueado)}>
           {saving ? tc("saving") : tc("save")}
         </button>
-        <button onClick={alCheckbook} disabled={saving || bloqueado || dirty}
-          title={t("moveHint")} style={btn(!saving && !bloqueado && !dirty)}>
+        {/* `!data?.config` incluido: sin fila guardada el backend contesta 422 y
+            bien, pero el botón estaba encendido y lo invitaba a apretarlo. El
+            freno se pone antes, no después. */}
+        <button onClick={alCheckbook} disabled={saving || bloqueado || dirty || !data?.config}
+          title={t("moveHint")} style={btn(!saving && !bloqueado && !dirty && !!data?.config)}>
           {t("moveToCheckbook")}
         </button>
         <button onClick={recalcular} disabled={recalc || bloqueado} style={btn(!recalc && !bloqueado)}>
