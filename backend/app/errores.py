@@ -754,6 +754,25 @@ MENSAJES: dict[str, dict[str, str]] = {
     "rooms.reparto_supera_100": {
         "es": "El mes {mes} reparte {pct}% del costo de Rooms. No se puede pasar del 100%: lo que no se asigna es lo que le queda a Rooms Standard.",
         "en": "Month {mes} allocates {pct}% of the Rooms cost. It cannot go above 100%: whatever is not allocated is what stays with Rooms Standard."},
+    # ── Planning → A&B ────────────────────────────────────────────────────────
+    # La captura es una FRACCIÓN. Un 35 escrito donde va 0,35 multiplica el
+    # ingreso de comida por cien y la pantalla lo muestra sin pestañear, así que
+    # se corta en la puerta y se dice cuál de las tres comidas fue.
+    "fb.captura_fuera_de_rango": {
+        "es": "La captura de {comida} es {valor}. Va entre 0 y 1: 0,35 es «el 35% de los pax toma esa comida».",
+        "en": "The {comida} capture rate is {valor}. It goes between 0 and 1: 0.35 means “35% of guests take that meal”."},
+    "fb.servicio_fuera_de_rango": {
+        "es": "El servicio es {valor}. Va entre 0 y 1: 0,10 es el 10%.",
+        "en": "The service charge is {valor}. It goes between 0 and 1: 0.10 is 10%."},
+    "fb.bev_negativo": {
+        "es": "El porcentaje de bebida sobre comida es {valor}. No puede ser negativo.",
+        "en": "The beverage-over-food ratio is {valor}. It cannot be negative."},
+    "fb.sin_configuracion": {
+        "es": "Este escenario todavía no tiene precios ni captura de A&B. Llenalos y guardá antes de pasarlos al checkbook.",
+        "en": "This scenario has no F&B prices or capture rates yet. Fill them in and save before moving them to the checkbook."},
+    "fb.recalcular_despues": {
+        "es": "Food y Beverage quedaron escritos en el checkbook. Recalculá para que el P&L los tome.",
+        "en": "Food and Beverage were written to the checkbook. Recalculate so the P&L picks them up."},
 }
 
 

@@ -139,3 +139,8 @@ from app.models.import_registro import ImportBatch, ImportFile, ESTADOS, MODOS
 # Guillermo Fase 1: configuración, latido, manifiesto y cola de excepciones.
 from app.models.guillermo import (
     GuillermoConfig, GuillermoHeartbeat, ExpectedReport, ImportException)
+# Planificación de A&B (owner 2026-10-03): precios y captura por comida, pax
+# externos por mes. Reemplaza al motor de paquetes para las propiedades que no
+# venden Full Board.
+from app.models.fb_plan import (
+    FbPlanConfig, FbPlanMes, COMIDAS, DEFAULT_SERVICIO, calcular_mes)

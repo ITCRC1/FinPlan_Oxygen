@@ -5220,3 +5220,49 @@ export async function getPosiciones(
   const ids = scenarioIds.filter(Boolean).join(",");
   return api.get(`/payroll/posiciones/?scenarios=${encodeURIComponent(ids)}`);
 }
+
+// ─── Planning → A&B: del pax a la comida, y de la comida al ingreso ──────────
+//
+// Owner, 2026-10-03. Reemplaza al motor de PAQUETES para las propiedades que no
+// venden Full Board: los pax hospedados salen de las estadísticas de Rooms y
+// acá se les pone precio y captura por comida.
+export interface FbPlanConfigDTO {
+  precio_desayuno: string; precio_almuerzo: string; precio_cena: string;
+  captura_desayuno: string; captura_almuerzo: string; captura_cena: string;
+  servicio_pct: string; bev_pct_food: string;
+}
+export interface FbPlanMesDTO {
+  month: number;
+  desayuno: string; almuerzo: string; cena: string;
+  food_hospedados: string; food_externos: string; food_pre_servicio: string;
+  servicio: string; food: string; beverage: string; total: string;
+  pax_hospedados: string; pax_externos: string; pax_total: string;
+}
+export interface FbPlanResponse {
+  scenario_id: string;
+  locked: boolean;
+  /** El escenario no tiene estadísticas de Rooms: sin pax no hay comida. */
+  sin_estadisticas: boolean;
+  config: FbPlanConfigDTO | null;
+  meses: FbPlanMesDTO[];
+  total: Record<string, string>;
+}
+
+export async function getFbPlan(scenarioId: string): Promise<FbPlanResponse> {
+  return api.get<FbPlanResponse>(`/fb-plan/${scenarioId}/`);
+}
+
+export async function saveFbPlan(
+  scenarioId: string,
+  config: Record<string, number>,
+  meses: { month: number; pax_externos: number; ticket_externos: number }[],
+): Promise<FbPlanResponse> {
+  return api.put<FbPlanResponse>(`/fb-plan/${scenarioId}/`, { config, meses });
+}
+
+/** Escribe SÓLO las líneas FOOD y BEVERAGE del checkbook. Las demás no se tocan. */
+export async function fbPlanAlCheckbook(
+  scenarioId: string,
+): Promise<{ scenario_id: string; escritas: Record<string, string>; nota: string }> {
+  return api.post(`/fb-plan/${scenarioId}/pasar-al-checkbook/`, {});
+}

@@ -45,6 +45,7 @@ from app.models.scenario_stat import ScenarioStat
 from app.models.statistical_entry import StatisticalEntry
 from app.models.club_membership_stat import ClubMembershipStat
 from app.models.club_fee_budget import ClubFeeBudget
+from app.models.fb_plan import FbPlanConfig, FbPlanMes
 from app.models.pl_manual_input import PLManualInput
 from app.models.actual_entry import ActualEntry
 from app.models.actual_pl_line import ActualPLLine
@@ -146,7 +147,12 @@ COPY_DATASETS: dict[str, list] = {
                  RevenueEntry, SpaBudget, ScenarioMaster, PkgExperience,
                  # El precio de la cuota del Club es modelo de ingresos, igual
                  # que el capture rate y el precio del Spa.
-                 ClubFeeBudget],
+                 ClubFeeBudget,
+                 # A&B: precios y captura por comida, y los pax externos del mes.
+                 # Es modelo de ingresos por el mismo motivo que el Spa y el
+                 # Club: sin él, copiar un Budget deja la comida en cero y el
+                 # P&L pierde un departamento entero sin decir por qué.
+                 FbPlanConfig, FbPlanMes],
     # El conteo de socios del Club viaja con los estadísticos: al copiar un
     # Budget, la proyección de socios (121 → 129) es parte del plan, igual
     # que la ocupación proyectada.

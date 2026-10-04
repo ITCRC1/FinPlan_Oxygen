@@ -52,6 +52,7 @@
       "packageComponents": "Package Components",
       "netRate": "Net Rate",
       "spaCapture": "Spa (capture rate)",
+      "fbPlan": "F&B (meals)",
       "totalRevenue": "Total Revenue",
       "revenueCheckbook": "Checkbook (USD)",
       "payrollByDept": "By Department",
@@ -4315,5 +4316,37 @@
       "elDetalleOperativo": "The same KPIs with the operational detail"
     }
   },
-  "planningReport": "Planning Report (12 months · year)"
+  "planningReport": "Planning Report (12 months · year)",
+  "fbPlan": {
+    "title": "F&B — from guests to meals",
+    "intro": "In-house guests come from the Rooms statistics and are not typed here. What you enter is the price of each meal, what share of guests takes it, and the month's external guests with their average check. Multiplying guests by all three meals gives the ceiling, not the revenue: the capture rate is what separates the two.",
+    "month": "Month",
+    "paxInHouse": "In-house pax",
+    "paxExternal": "External pax",
+    "ticket": "Avg. check",
+    "paxTotal": "Total pax",
+    "meal_desayuno": "Breakfast",
+    "meal_almuerzo": "Lunch",
+    "meal_cena": "Dinner",
+    "price_desayuno": "Breakfast $/pax",
+    "price_almuerzo": "Lunch $/pax",
+    "price_cena": "Dinner $/pax",
+    "capture_desayuno": "Breakfast capture",
+    "capture_almuerzo": "Lunch capture",
+    "capture_cena": "Dinner capture",
+    "serviceCharge": "Service charge (added)",
+    "bevPctFood": "Beverage % of Food",
+    "foodExternal": "External food",
+    "service": "Service",
+    "food": "Food",
+    "beverage": "Beverage",
+    "total": "F&B total",
+    "saved": "✓ Saved",
+    "moveToCheckbook": "→ Move to checkbook",
+    "moveHint": "Writes ONLY the Food and Beverage lines of the checkbook. Spa, Tours and the rest are left alone. Save first.",
+    "movedToCheckbook": "✓ Written to the checkbook — Food {food} · Beverage {bev}. Recalculate so the P&L picks it up.",
+    "recalc": "↻ Recalculate P&L",
+    "recalculated": "✓ Recalculated",
+    "noStats": "This scenario has no Rooms statistics, so there are no in-house guests and food comes out zero. Load the occupancy first."
+  }
 }

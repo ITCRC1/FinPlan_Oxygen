@@ -86,6 +86,10 @@ export const NAV: NavGroup[] = [
       { key: "packageComponents", href: "/revenue/package-components" },
       { key: "netRate", href: "/revenue/net-rate" },
       { key: "spaCapture", href: "/revenue/spa" },
+      // A&B (owner 2026-10-03). Va al lado del Spa porque es el mismo tipo de
+      // pantalla: pax × precio × captura. No va en `/revenue/` como las demás
+      // porque sustituye al motor de paquetes, no lo acompaña.
+      { key: "fbPlan", href: "/planning/fb" },
       { key: "club", href: "/revenue/club" },
       { key: "totalRevenue", href: "/revenue/total-revenue" },
       { key: "revenueCheckbook", href: "/revenue/checkbook" },
