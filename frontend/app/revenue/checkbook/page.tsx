@@ -2,6 +2,13 @@
 import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
   from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+// ⚠️ El parser COMPARTIDO. El que vivía acá hacía `replace(/[, $]/g, "")`, o
+// sea borraba todas las comas: un `2,1` o un `725,50` copiado de un Excel en
+// español entraba multiplicado por diez o por cien. `numeroDeExcel` mira la
+// POSICIÓN de la coma para saber si es decimal o separador de miles, y es el
+// mismo que usan las demás grillas — con uno por pantalla, el mismo número
+// entra distinto en cada una.
+import { celdasPegadas, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
 import { useTranslations } from "next-intl";
@@ -50,10 +57,7 @@ const SIN_TARIFAS = {
 };
 type DriverRatesUI = typeof SIN_TARIFAS;
 
-function num(v: string): number {
-  const n = parseFloat((v || "").toString().replace(/[, $]/g, ""));
-  return isNaN(n) ? 0 : n;
-}
+const num = numeroDeExcel;
 function fmtUsd(v: string | number): string {
   const n = typeof v === "string" ? num(v) : v;
   if (!n) return "—";
@@ -177,10 +181,9 @@ export default function RevenueCheckbookPage() {
 
   // Excel-style paste: distribute a tab/newline block starting at (rowIdx, monthIdx).
   function handlePaste(rowIdx: number, monthIdx: number, e: React.ClipboardEvent) {
-    const text = e.clipboardData.getData("text");
-    if (!text || (!text.includes("\t") && !text.includes("\n"))) return; // single value → default
+    const grid = celdasPegadas(e.clipboardData.getData("text"));
+    if (!grid) return;          // una celda sola: la escribe el navegador
     e.preventDefault();
-    const grid = text.replace(/\r/g, "").split("\n").filter(l => l.length).map(l => l.split("\t"));
     setRows(prev => {
       const next = prev.map(r => ({ ...r }));
       grid.forEach((cells, dr) => {

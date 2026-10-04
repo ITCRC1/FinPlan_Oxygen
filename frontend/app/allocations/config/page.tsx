@@ -1,6 +1,7 @@
 "use client";
 import BloqueSeguro from "@/components/BloqueSeguro";
 import { borrarFilaReparto } from "@/lib/api";
+import { celdasPegadas, numeroDeExcel } from "@/lib/pegarGrilla";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
@@ -49,14 +50,12 @@ function scnLabel(s: Scenario) {
   return (!s.version || ["actual", "from-xlsx"].includes(s.version)) ? `${t} ${s.year}` : `${t} ${s.year} · ${s.version}`;
 }
 
-// Parsea texto pegado de Excel (filas por \n, celdas por \t) a una matriz de números.
+/** El bloque de Excel como matriz de números, con el parser COMPARTIDO.
+ *
+ *  ⚠️ El que vivía acá borraba todas las comas: un número en formato español
+ *  entraba multiplicado por diez o por cien. */
 function parseClip(text: string): number[][] {
-  return text.replace(/\r/g, "").split("\n").filter(l => l.trim() !== "").map(line =>
-    line.split("\t").map(c => {
-      const n = parseFloat(c.replace(/[$,\s]/g, ""));
-      return isNaN(n) ? 0 : n;
-    })
-  );
+  return (celdasPegadas(text) ?? []).map(fila => fila.map(numeroDeExcel));
 }
 
 function Badge({ ok }: { ok: boolean }) {

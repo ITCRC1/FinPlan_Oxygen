@@ -1,5 +1,6 @@
 "use client";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, repartirPegado } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
   from "@/lib/mesesCerrados";
@@ -46,8 +47,10 @@ function fmtUsdTxt(v: string | number) {
   return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
-function NumCell({ value, onSave, cerrado }: {
+function NumCell({ value, onSave, cerrado, onPegar }: {
   value: string; onSave: (v: number) => void;
+  /** Un bloque pegado desde Excel, con esta celda como esquina. */
+  onPegar?: (bloque: string[][]) => void;
   /** El mes ya tiene actuales: se muestra, no se edita. */
   cerrado?: boolean;
 }) {
@@ -85,6 +88,9 @@ function NumCell({ value, onSave, cerrado }: {
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
+          onPaste={onPegar
+            ? e => manejarPegado(e, b => { setEditing(false); onPegar(b); })
+            : undefined}
           onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
           className="fin-input"
           style={{ width: 80, textAlign: "right" }}
@@ -100,6 +106,7 @@ function AccountGroup({
   expanded,
   onToggle,
   onSaveEntry,
+  onPegarBloque,
   onToggleMoneda,
   onAddLines,
   saving,
@@ -110,6 +117,10 @@ function AccountGroup({
   expanded: boolean;
   onToggle: () => void;
   onSaveEntry: (entry: OpexEntry, monthKey: string, value: number) => void;
+  /** Un bloque de Excel pegado: `{línea: {mes: valor}}`, en una sola pasada.
+   *  ⚠️ Agrupado por LÍNEA: guardar de a una celda es un PATCH y una recarga
+   *  del departamento cada vez. */
+  onPegarBloque: (porLinea: { entry: OpexEntry; meses: Record<string, number> }[]) => void;
   onToggleMoneda: (entry: OpexEntry) => void;
   onAddLines: (acct: OpexAccount) => void;
   saving: string | null;
@@ -117,6 +128,26 @@ function AccountGroup({
   /** ¿Este mes (1..12) ya tiene actuales? Lo decide el backend. */
   cerrado: (mes: number) => boolean;
 }) {
+  /**
+   * Reparte un bloque de Excel desde la celda: a la derecha y hacia abajo,
+   * **sin salirse de esta cuenta** —las líneas de otra están separadas por su
+   * subtotal y seguir de largo escribiría donde nadie estaba mirando—.
+   */
+  function pegarDesde(li: number, mi: number, bloque: string[][]) {
+    const porLinea = new Map<string, { entry: OpexEntry; meses: Record<string, number> }>();
+    repartirPegado(bloque, li, mi, acct.lines.length, MONTH_KEYS.length,
+      (f, c, valor) => {
+        if (cerrado(c + 1)) return;
+        const linea = acct.lines[f];
+        const crc = (linea.currency ?? "USD") === "CRC";
+        const slot = porLinea.get(linea.id)
+          ?? { entry: linea, meses: {} as Record<string, number> };
+        slot.meses[`${crc ? "crc_" : ""}${MONTH_KEYS[c]}`] = numeroDeExcel(valor);
+        porLinea.set(linea.id, slot);
+      });
+    if (porLinea.size) onPegarBloque([...porLinea.values()]);
+  }
+
   const t = useTranslations("opexCheckbook");
   const isAdding = addingLines === acct.account_code;
 
@@ -172,7 +203,7 @@ function AccountGroup({
       </tr>
 
       {/* Detail lines */}
-      {expanded && acct.lines.map(line => (
+      {expanded && acct.lines.map((line, li) => (
         <tr key={line.id} style={{ opacity: saving === line.id ? 0.6 : 1 }}>
           <td style={{
             color: "var(--text-secondary)", fontSize: 10,
@@ -206,6 +237,7 @@ function AccountGroup({
                 value={line.crc_months?.[mk] ?? "0"}
                 cerrado={cerrado(mi + 1)}
                 onSave={v => onSaveEntry(line, `crc_${mk}`, v)}
+                onPegar={b => pegarDesde(li, mi, b)}
               />
             ) : (
               <NumCell
@@ -213,6 +245,7 @@ function AccountGroup({
                 value={line.months[mk] ?? "0"}
                 cerrado={cerrado(mi + 1)}
                 onSave={v => onSaveEntry(line, mk, v)}
+                onPegar={b => pegarDesde(li, mi, b)}
               />
             )
           ))}
@@ -362,6 +395,27 @@ export default function OpexCheckbookPage() {
     setSaving(entry.id);
     try {
       await updateOpexEntry(scenarioId, entry.id, { [monthKey]: value });
+      if (selectedDept) await loadDept(selectedDept);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  /**
+   * Un bloque de Excel pegado en el checkbook.
+   *
+   * ⚠️ **Un PATCH por LÍNEA y UNA sola recarga.** Celda por celda son doce
+   * viajes y doce recargas por fila; el endpoint acepta varios meses juntos.
+   */
+  async function handlePegarBloque(
+    porLinea: { entry: OpexEntry; meses: Record<string, number> }[],
+  ) {
+    if (!scenarioId || !porLinea.length) return;
+    setSaving(porLinea[0].entry.id);
+    try {
+      for (const { entry, meses } of porLinea) {
+        await updateOpexEntry(scenarioId, entry.id, meses);
+      }
       if (selectedDept) await loadDept(selectedDept);
     } finally {
       setSaving(null);
@@ -706,6 +760,7 @@ export default function OpexCheckbookPage() {
                   expanded={expanded.has(acct.account_code)}
                   onToggle={() => toggleAccount(acct.account_code)}
                   onSaveEntry={handleSaveEntry}
+                  onPegarBloque={handlePegarBloque}
                   onToggleMoneda={handleToggleMoneda}
                   onAddLines={handleAddLines}
                   saving={saving}

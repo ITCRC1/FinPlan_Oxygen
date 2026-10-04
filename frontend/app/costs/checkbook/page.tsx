@@ -2,6 +2,7 @@
 import { useMesesCerrados, CELDA_CERRADA, CABECERA_CERRADA, TITULO_CERRADO }
   from "@/lib/mesesCerrados";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, repartirPegado } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import AvisoMoneda from "@/components/AvisoMoneda";
@@ -62,9 +63,11 @@ function fmtPct(v: string) {
 
 // Inline editable number cell
 function NumCell({
-  value, onSave, disabled = false, cerrado = false,
+  value, onSave, disabled = false, cerrado = false, onPegar,
 }: {
   value: string; onSave: (v: number) => void; disabled?: boolean;
+  /** Un bloque pegado desde Excel, con esta celda como esquina. */
+  onPegar?: (bloque: string[][]) => void;
   /** El mes ya tiene actuales: se muestra, no se edita. */
   cerrado?: boolean;
 }) {
@@ -105,6 +108,9 @@ function NumCell({
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
+          onPaste={onPegar
+            ? e => manejarPegado(e, b => { setEditing(false); onPegar(b); })
+            : undefined}
           onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
           className="fin-input"
           style={{ width: 90, textAlign: "right" }}
@@ -234,6 +240,38 @@ export default function CostsCheckbookPage() {
     setSaving(entry.id);
     try {
       await updateCostEntry(scenarioId, entry.id, { [monthKey]: value });
+      if (selectedDept) await loadDept(selectedDept);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  /**
+   * Un bloque de Excel pegado: a la derecha y hacia abajo desde la celda.
+   *
+   * ⚠️ **Un PATCH por LÍNEA y UNA recarga al final.** Y se saltean las líneas
+   * con DRIVER: su monto lo calcula el motor, y pisarlo a mano lo dejaría
+   * mintiendo hasta el siguiente recálculo.
+   */
+  async function pegarDesde(ei: number, mi: number, bloque: string[][]) {
+    if (!scenarioId || !checkbook) return;
+    const porLinea = new Map<string, { entry: CostEntry; meses: Record<string, number> }>();
+    repartirPegado(bloque, ei, mi, checkbook.entries.length, MONTH_KEYS.length,
+      (f, c, valor) => {
+        if (cerrado(c + 1)) return;
+        const entry = checkbook.entries[f];
+        if (entry.calc_mode === "DRIVER") return;
+        const slot = porLinea.get(entry.id)
+          ?? { entry, meses: {} as Record<string, number> };
+        slot.meses[MONTH_KEYS[c]] = numeroDeExcel(valor);
+        porLinea.set(entry.id, slot);
+      });
+    if (!porLinea.size) return;
+    setSaving([...porLinea.values()][0].entry.id);
+    try {
+      for (const { entry, meses } of porLinea.values()) {
+        await updateCostEntry(scenarioId, entry.id, meses);
+      }
       if (selectedDept) await loadDept(selectedDept);
     } finally {
       setSaving(null);
@@ -521,7 +559,7 @@ export default function CostsCheckbookPage() {
                   </td>
                 </tr>
               ) : (
-                checkbook.entries.map(entry => {
+                checkbook.entries.map((entry, ei) => {
                   const isDriver = entry.calc_mode === "DRIVER";
                   const isSaving = saving === entry.id;
 
@@ -642,6 +680,7 @@ export default function CostsCheckbookPage() {
                             disabled={isDriver}
                             cerrado={cerrado(MONTH_KEYS.indexOf(mk) + 1)}
                             onSave={v => saveEntryMonth(entry, mk, v)}
+                            onPegar={b => pegarDesde(ei, MONTH_KEYS.indexOf(mk), b)}
                           />
                         )
                       ))}
