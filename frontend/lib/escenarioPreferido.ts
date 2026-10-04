@@ -59,13 +59,29 @@ export const PREFERENCIA: Record<Rol, { type: string; year: number; version?: st
   // 2026-09-03, owner: «siempre de primero ACTUAL, segundo BUDGET 2026 y
   // después FORECAST 2026; siempre entro y están 2035 y otras versiones».
   //
-  // Los tres son 2026 porque 2026 es el año en curso del ciclo: el ACTUAL va
+  // Los tres eran 2026 porque 2026 es el año en curso del ciclo: el ACTUAL va
   // por julio, el BUDGET es contra lo que se compara y el FORECAST es lo que
-  // se está trabajando. Los BUDGET Working 2027..2035 existen pero están en
-  // CERO —son andamiaje de `ensure-working`—, así que abrir ahí mostraba un
+  // se está trabajando. Los BUDGET Working 2027..2035 existían pero estaban en
+  // CERO —andamiaje de `ensure-working`—, así que abrir ahí mostraba un
   // reporte real y perfectamente vacío.
   actual:         { type: "ACTUAL",   year: 2026 },
-  budget:         { type: "BUDGET",   year: 2026, version: "Final" },
+  // ⚠️ El BUDGET pasó a 2027 el 2026-10-03. Owner: «quiero que en planning
+  // dejes esclavizado Budget 2027 Working, dejalo fijo ahí; y si lo quiero
+  // cambiar lo cambio».
+  //
+  // **El motivo del 2026 se venció.** El 2027 de esta propiedad ya NO está en
+  // cero: ese día se le cargó la planilla real (34 posiciones, $675.058), el
+  // OPEX del mayor 2025 (60 líneas, $702.139) y el inventario correcto de 13
+  // villas. Es el presupuesto que se está construyendo, y abrir en 2026 mandaba
+  // a mirar el año que ya pasó.
+  //
+  // Y había una contradicción vieja: el encabezado de este archivo dice desde
+  // el 2026-08-14 que «la base sea Budget Working 2027», pero el valor decía
+  // 2026 Final. En Oxygen ese escenario NI SIQUIERA EXISTE —sólo hay Working
+  // 2026—, así que `elegir()` caía por el escalón del año y aterrizaba igual en
+  // 2026. Eso fue lo que hizo que la pantalla de A&B abriera sin pax hasta
+  // mayo: el 2026 de esta propiedad abre en junio.
+  budget:         { type: "BUDGET",   year: 2027, version: "Working" },
   forecast:       { type: "FORECAST", year: 2026, version: "Working" },
   // El año anterior sigue siendo el anterior: es para los reportes que comparan
   // dos años cerrados, y ahí 2026 contra 2026 no compara nada.
@@ -91,7 +107,11 @@ export const PREFERENCIA: Record<Rol, { type: string; year: number; version?: st
  * «borrá las preferencias» de rutina: lo que el owner elija DESPUÉS tiene que
  * quedarse quieto, que es todo el punto de este módulo.
  */
-export const GENERACION = "2026-09-03-los-tres-de-2026";
+// 2026-10-03: sube porque el BUDGET se mudó a Working 2027. Sin esto, el id del
+// 2026 que cada navegador tiene recordado le seguiría ganando al default —que
+// es exactamente el modo de falla que esta constante existe para cortar— y el
+// owner volvería a abrir en el año viejo sin que nada lo explique.
+export const GENERACION = "2026-10-03-budget-working-2027";
 const LLAVE_GEN = "finplan_esc_generacion";
 
 /** Lo que NO se toca al cambiar de generación: la sesión.
