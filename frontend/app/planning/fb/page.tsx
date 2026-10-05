@@ -20,6 +20,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { usePlanningScenarioConUrl } from "@/lib/planningScenario";
+import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import { elegir } from "@/lib/escenarioPreferido";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
@@ -143,6 +144,58 @@ export default function FbPlanPage() {
 
   const bloqueado = !!data?.locked;
 
+  /**
+   * El MISMO cuadro que se ve, a Excel.
+   *
+   * Lo pedía `test_toda_pantalla_con_cuadro_se_puede_bajar`: toda pantalla que
+   * muestra una tabla tiene que dejar bajarla. Esta era la única de la
+   * propiedad que no — se miraba y se volvía a teclear en otro lado.
+   *
+   * ⚠️ Los meses van en FILAS, que es como está la pantalla. Transponerlo para
+   * que se parezca a los otros cuadros daría un Excel que no es el que se vio.
+   */
+  async function bajarExcel() {
+    const sel = scenarios.find(x => x.id === scenarioId);
+    const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
+    const fila = (i: number): FilaCuadro => {
+      const f = filas[i];
+      return { label: MONTHS[i], valores: [
+        f.pax, n(paxExt[i]), n(ticket[i]), f.pax + n(paxExt[i]),
+        ...COMIDAS.map(c => f[c] as number),
+        f.foodExt, f.sc, f.food, f.bev, f.total] };
+    };
+    const cuerpo = filas.map((_f, i) => fila(i));
+    const extTot = paxExt.reduce((a, v) => a + n(v), 0);
+    cuerpo.push({ label: tc("total"), es_total: true,
+      suma_de: filas.map((_f, i) => i),
+      valores: [tot.pax, extTot, 0, tot.pax + extTot,
+                ...COMIDAS.map(c => filas.reduce((a, f) => a + (f[c] as number), 0)),
+                tot.foodExt, tot.sc, tot.food, tot.bev, tot.total] });
+    try {
+      await bajarCuadros("AyB", [{
+        titulo: t("title"),
+        subtitulo: esc,
+        hoja: "A&B",
+        columnas: [
+          { label: t("month"), ancho: 14, formato: "texto" },
+          { label: t("paxInHouse"), ancho: 13, formato: "num" },
+          { label: t("paxExternal"), ancho: 13, formato: "num" },
+          { label: t("ticket"), ancho: 13, formato: "usd2" },
+          { label: t("paxTotal"), ancho: 13, formato: "num" },
+          ...COMIDAS.map(c => ({ label: t(`meal_${c}`), ancho: 14, formato: "usd2" as const })),
+          { label: t("foodExternal"), ancho: 14, formato: "usd2" },
+          { label: t("service"), ancho: 13, formato: "usd2" },
+          { label: t("food"), ancho: 14, formato: "usd2" },
+          { label: t("beverage"), ancho: 14, formato: "usd2" },
+          { label: t("total"), ancho: 15, formato: "usd2" },
+        ],
+        filas: cuerpo,
+      }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : tc("error"));
+    }
+  }
+
   async function guardar() {
     if (!scenarioId) return;
     setSaving(true); setError(null); setMsg(null);
@@ -230,6 +283,12 @@ export default function FbPlanPage() {
         <button onClick={recalcular} disabled={recalc || bloqueado} style={btn(!recalc && !bloqueado)}>
           {recalc ? tc("recalc.running") : t("recalc")}
         </button>
+        <button onClick={bajarExcel} disabled={loading}
+          style={{ padding: "7px 16px", fontSize: 13, fontWeight: 700, borderRadius: 6,
+                   cursor: loading ? "default" : "pointer", background: "transparent",
+                   color: "var(--positive)", border: "1px solid var(--positive)" }}>
+          ⬇ Excel
+        </button>
       </div>
 
       {data?.sin_estadisticas && (
@@ -251,7 +310,7 @@ export default function FbPlanPage() {
       </div>
 
       {loading ? <div style={{ padding: 24 }}>{tc("loading")}</div> : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>

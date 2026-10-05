@@ -18,15 +18,28 @@ CIERRE = FRONT / "app/month-end/pl"
 SUBTABS = ["Auditoria", "DoceMeses", "Formato", "ResumenDoceMeses"]
 
 
-def test_los_tres_papeles_apuntan_a_2026():
-    """La regla del owner, escrita en UN solo lugar."""
+def test_cada_papel_abre_DONDE_EL_OWNER_PIDIO():
+    """La regla del owner, escrita en UN solo lugar.
+
+    ⚠️ **No son todos el mismo año, y esa es la regla.** Esta prueba exigia
+    `2026` para los tres y se llamaba `..._apuntan_a_2026`; el 2026-10-03 el
+    owner movio el BUDGET a 2027 Working —«quiero que en planning dejes
+    esclavizado Budget 2027 Working»— porque ese año dejo de estar en cero, y la
+    prueba se quedo pidiendo el año viejo. Quedo en rojo dos dias diciendo que
+    el codigo estaba mal cuando el codigo era lo unico al dia.
+
+    El ACTUAL y el FORECAST siguen en 2026: el actual es el año que se esta
+    cerrando y el forecast el que se esta trabajando. El historial de POR QUE
+    esta en `test_escenario_por_defecto.py`, que es donde se lee la decision.
+    """
     src = PREF.read_text(encoding="utf-8")
     bloque = src[src.index("export const PREFERENCIA"):src.index("export const GENERACION")]
-    for rol in ("actual", "budget", "forecast"):
+    ESPERADO = {"actual": "2026", "budget": "2027", "forecast": "2026"}
+    for rol, anio in ESPERADO.items():
         m = re.search(rol + r":\s*\{[^}]*year:\s*(\d{4})", bloque)
         assert m, f"no encontré el año de {rol}"
-        assert m.group(1) == "2026", (
-            f"{rol} abre en {m.group(1)} y el owner pidió 2026")
+        assert m.group(1) == anio, (
+            f"{rol} abre en {m.group(1)} y el owner pidió {anio}")
 
 
 def test_la_limpieza_alcanza_a_la_memoria_de_CIERRE_DE_MES():

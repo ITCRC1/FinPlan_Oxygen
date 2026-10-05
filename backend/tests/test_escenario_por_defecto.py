@@ -243,13 +243,28 @@ def test_la_preferencia_es_la_que_pidio_el_owner():
 
       `actualAnterior` se queda en 2025: es para los reportes que comparan dos
       años cerrados, y ahi 2026 contra 2026 no compara nada.
+    * 2026-10-03: **el BUDGET vuelve a 2027 Working.** Owner: «quiero que en
+      planning dejes esclavizado Budget 2027 Working, dejalo fijo ahi; y si lo
+      quiero cambiar lo cambio».
 
-    Que haya ido y vuelto tres veces es la razon de que esta prueba exista.
+      El motivo del 3-set se vencio: ese dia el 2027 de esta propiedad dejo de
+      estar en cero —se le cargo la planilla real, el OPEX del mayor 2025 y el
+      inventario de 13 villas—, asi que abrir en 2026 mandaba a mirar el año que
+      ya paso. Y habia una contradiccion vieja: el encabezado del archivo decia
+      desde el 14-ago que la base fuera Budget Working 2027 mientras el valor
+      decia 2026 Final, un escenario que en Oxygen NI SIQUIERA EXISTE.
+
+    Que haya ido y vuelto cuatro veces es la razon de que esta prueba exista.
+
+    ⚠️ Y que esta prueba se haya quedado dos dias contando la version del 3-set
+    mientras el codigo ya decia otra cosa es la razon de que diga el historial:
+    quien cambie el valor tiene que venir aca a escribir POR QUE, y si no lo
+    hace, la prueba se cae.
     """
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
     for esperado in (
         'actual:         { type: "ACTUAL",   year: 2026 }',
-        'budget:         { type: "BUDGET",   year: 2026, version: "Final" }',
+        'budget:         { type: "BUDGET",   year: 2027, version: "Working" }',
         'forecast:       { type: "FORECAST", year: 2026, version: "Working" }',
         'actualAnterior: { type: "ACTUAL",   year: 2025 }',
     ):
@@ -266,7 +281,7 @@ def test_cambiar_la_preferencia_despega_lo_guardado():
 
     La generacion tiene que nombrar la regla que rige HOY."""
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
-    assert 'export const GENERACION = "2026-09-03-los-tres-de-2026";' in txt, (
+    assert 'export const GENERACION = "2026-10-03-budget-working-2027";' in txt, (
         "cambiaron los años de la preferencia y no subieron GENERACION: "
         "el owner va a seguir viendo lo viejo")
 
