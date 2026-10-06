@@ -1,0 +1,68 @@
+{
+  "_nota": "Los siete sub-canales de Oxygen. Mix y comision PENDIENTES del owner: solo B2B y DIR_WEB traen el mix que ya estaba cargado; los otros cinco entran en cero para que existan en la pantalla y se puedan completar. El seed no pisa lo ya cargado.",
+  "canales": [
+    {
+      "code": "B2B",
+      "nombre": "B2B — agency / DMC / TO",
+      "comision_pct": 0.0,
+      "entrada": "Travel Agent",
+      "orden": 1,
+      "mix_pct": 0.55,
+      "rueda_a": "TA"
+    },
+    {
+      "code": "DIR_WEB",
+      "nombre": "Direct — website / booking engine",
+      "comision_pct": 0.0,
+      "entrada": "Website",
+      "orden": 2,
+      "mix_pct": 0.45,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "DIR_TEL",
+      "nombre": "Direct — phone / email / social",
+      "comision_pct": 0.0,
+      "entrada": "Direct Client",
+      "orden": 3,
+      "mix_pct": 0.0,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "CRC_DIRECT",
+      "nombre": "Costa Rica Collection direct",
+      "comision_pct": 0.0,
+      "entrada": "",
+      "orden": 4,
+      "mix_pct": 0.0,
+      "rueda_a": "CRC"
+    },
+    {
+      "code": "DIR_GROUPS",
+      "nombre": "Direct groups",
+      "comision_pct": 0.0,
+      "entrada": "",
+      "orden": 5,
+      "mix_pct": 0.0,
+      "rueda_a": "GROUPS"
+    },
+    {
+      "code": "EXEC_DIRECT",
+      "nombre": "Executive personal direct",
+      "comision_pct": 0.0,
+      "entrada": "",
+      "orden": 6,
+      "mix_pct": 0.0,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "OTA",
+      "nombre": "OTA",
+      "comision_pct": 0.0,
+      "entrada": "OTA",
+      "orden": 7,
+      "mix_pct": 0.0,
+      "rueda_a": "OTA"
+    }
+  ]
+}
