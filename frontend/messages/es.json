@@ -1849,7 +1849,26 @@
     "totalExperience": "Total experiencia ({n}N)",
     "xlsRackNetSheet": "Rack y Net Rate",
     "emptyTitle": "Todavía no hay experiencias en este escenario.",
-    "emptyBody": "Creá una con «{boton}» y agregale sus componentes con «{inclusion}». El Rack & Net se arma con los componentes de la experiencia marcada con ★."
+    "emptyBody": "Creá una con «{boton}» y agregale sus componentes con «{inclusion}». El Rack & Net se arma con los componentes de la experiencia marcada con ★.",
+    "fbPrices": "Precios de A&B — desayuno, almuerzo y cena",
+    "fbPricesHelp": "Precio de carta por pax y por comida, del escenario. El servicio de {pct}% se cobra al cliente y se entrega al personal: se muestra aparte porque no es ingreso del hotel.",
+    "fbNone": "Este escenario todavía no tiene precios de A&B cargados. Se cargan en Planning → A&B (comidas).",
+    "fbSheet": "Precios A&B",
+    "fbMeal": "Comida",
+    "fbPrice": "Precio",
+    "fbService": "Servicio (aparte)",
+    "fbCapture": "Captura",
+    "fbPerPax": "Por pax (bruto)",
+    "fbIfAllThree": "Si tomara las tres",
+    "fbRealPerPax": "Real por pax",
+    "fbRealHelp": "cada comida por su captura — es lo que de verdad se consume",
+    "fbEditedIn": "Estos precios se editan en Planning → A&B (comidas). Acá sólo se ven.",
+    "meal_desayuno": "Desayuno",
+    "meal_almuerzo": "Almuerzo",
+    "meal_cena": "Cena",
+    "fbNetPerPax": "Neto por pax",
+    "fbNetHelp": "menos la comision del canal sobre la parte comisionable ({pct}%)",
+    "fbServiceHint": "Se cobra al cliente y se entrega al personal. No es ingreso del hotel."
   },
   "rates": {
     "villaType": "Tipo de Villa",
@@ -4351,7 +4370,7 @@
   "planningReport": "Planning Report (12 meses · año)",
   "fbPlan": {
     "title": "A&B — del pax a la comida",
-    "intro": "Los pax hospedados salen de las estadísticas de Rooms y no se escriben acá. Lo que se digita es el precio de cada comida, qué fracción de los huéspedes la toma, y los pax externos del mes con su ticket promedio. Multiplicar pax por las tres comidas da el techo, no el ingreso: la captura es lo que separa una cosa de la otra.",
+    "intro": "Los pax hospedados salen de las estadísticas de Rooms y no se escriben acá. Lo que se digita es el precio de carta de cada comida, qué fracción de los huéspedes la toma, y los pax externos del mes con su ticket promedio. Del bruto se descuenta la comisión del canal, pero sólo sobre la parte que se vende con agencia: el externo paga en la puerta. El 10% de servicio se recauda para el personal y NO suma al ingreso.",
     "month": "Mes",
     "paxInHouse": "Pax hospedados",
     "paxExternal": "Pax externos",
@@ -4366,10 +4385,10 @@
     "capture_desayuno": "Captura desayuno",
     "capture_almuerzo": "Captura almuerzo",
     "capture_cena": "Captura cena",
-    "serviceCharge": "Servicio (se suma)",
+    "serviceCharge": "Servicio (no es ingreso)",
     "bevPctFood": "Beverage % de Food",
     "foodExternal": "Food externos",
-    "service": "Servicio",
+    "service": "Servicio recaudado",
     "food": "Food",
     "beverage": "Beverage",
     "total": "Total A&B",
@@ -4379,6 +4398,11 @@
     "movedToCheckbook": "✓ Escrito en el checkbook — Food {food} · Beverage {bev}. Recalculá para que el P&L lo tome.",
     "recalc": "↻ Recalcular P&L",
     "recalculated": "✓ Recalculado",
-    "noStats": "Este escenario no tiene estadísticas de Rooms, así que no hay pax hospedados y la comida da cero. Cargá la ocupación primero."
+    "noStats": "Este escenario no tiene estadísticas de Rooms, así que no hay pax hospedados y la comida da cero. Cargá la ocupación primero.",
+    "gross": "Bruto carta",
+    "discount": "Descuento",
+    "discountHint": "Comisión del canal sobre la parte que se vende con agencia. El externo no lleva.",
+    "commissionable": "Comisionable (%)",
+    "serviceHint": "Se cobra al cliente y se entrega al personal. No es ingreso del hotel."
   }
 }

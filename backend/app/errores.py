@@ -767,6 +767,12 @@ MENSAJES: dict[str, dict[str, str]] = {
     "fb.servicio_fuera_de_rango": {
         "es": "El servicio es {valor}. Va entre 0 y 1: 0,10 es el 10%.",
         "en": "The service charge is {valor}. It goes between 0 and 1: 0.10 is 10%."},
+    # La fracción de la comida que viaja en paquete de agencia. Escrita como 50
+    # en vez de 0,50 multiplicaría el descuento por cien y dejaría el Food en
+    # negativo — un ingreso negativo cuadra con todo y no se nota en el total.
+    "fb.comisionable_fuera_de_rango": {
+        "es": "La parte comisionable es {valor}. Va entre 0 y 1: 0,50 es «la mitad de la comida se vende con agencia».",
+        "en": "The commissionable share is {valor}. It goes between 0 and 1: 0.50 means “half the food is sold through agencies”."},
     "fb.bev_negativo": {
         "es": "El porcentaje de bebida sobre comida es {valor}. No puede ser negativo.",
         "en": "The beverage-over-food ratio is {valor}. It cannot be negative."},

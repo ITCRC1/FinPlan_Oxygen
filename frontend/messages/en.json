@@ -1849,7 +1849,26 @@
     "totalExperience": "Experience total ({n}N)",
     "xlsRackNetSheet": "Rack and Net Rate",
     "emptyTitle": "This scenario has no experiences yet.",
-    "emptyBody": "Create one with “{boton}” and add its components with “{inclusion}”. Rack & Net is built from the components of the experience marked ★."
+    "emptyBody": "Create one with “{boton}” and add its components with “{inclusion}”. Rack & Net is built from the components of the experience marked ★.",
+    "fbPrices": "F&B prices — breakfast, lunch and dinner",
+    "fbPricesHelp": "Menu price per guest and per meal, from the scenario. The {pct}% service charge is collected from the guest and handed to the staff: it is shown separately because it is not hotel revenue.",
+    "fbNone": "This scenario has no F&B prices loaded yet. They are entered in Planning → F&B (meals).",
+    "fbSheet": "F&B prices",
+    "fbMeal": "Meal",
+    "fbPrice": "Price",
+    "fbService": "Service (separate)",
+    "fbCapture": "Capture",
+    "fbPerPax": "Per guest (gross)",
+    "fbIfAllThree": "If all three were taken",
+    "fbRealPerPax": "Actual per guest",
+    "fbRealHelp": "each meal times its capture rate — what is actually consumed",
+    "fbEditedIn": "These prices are edited in Planning → F&B (meals). This view is read-only.",
+    "meal_desayuno": "Breakfast",
+    "meal_almuerzo": "Lunch",
+    "meal_cena": "Dinner",
+    "fbNetPerPax": "Net per guest",
+    "fbNetHelp": "less channel commission on the commissionable share ({pct}%)",
+    "fbServiceHint": "Charged to the guest and handed to the staff. Not hotel revenue."
   },
   "rates": {
     "villaType": "Villa type",
@@ -4351,7 +4370,7 @@
   "planningReport": "Planning Report (12 months · year)",
   "fbPlan": {
     "title": "F&B — from guests to meals",
-    "intro": "In-house guests come from the Rooms statistics and are not typed here. What you enter is the price of each meal, what share of guests takes it, and the month's external guests with their average check. Multiplying guests by all three meals gives the ceiling, not the revenue: the capture rate is what separates the two.",
+    "intro": "In-house guests come from the Rooms statistics and are not typed here. What you enter is each menu price, what share of guests takes that meal, and the month’s walk-ins with their average check. Channel commission comes off the gross, but only on the share sold through agencies: walk-ins pay at the door. The 10% service charge is collected for the staff and does NOT add to revenue.",
     "month": "Month",
     "paxInHouse": "In-house pax",
     "paxExternal": "External pax",
@@ -4366,10 +4385,10 @@
     "capture_desayuno": "Breakfast capture",
     "capture_almuerzo": "Lunch capture",
     "capture_cena": "Dinner capture",
-    "serviceCharge": "Service charge (added)",
+    "serviceCharge": "Service charge (not revenue)",
     "bevPctFood": "Beverage % of Food",
     "foodExternal": "External food",
-    "service": "Service",
+    "service": "Service collected",
     "food": "Food",
     "beverage": "Beverage",
     "total": "F&B total",
@@ -4379,6 +4398,11 @@
     "movedToCheckbook": "✓ Written to the checkbook — Food {food} · Beverage {bev}. Recalculate so the P&L picks it up.",
     "recalc": "↻ Recalculate P&L",
     "recalculated": "✓ Recalculated",
-    "noStats": "This scenario has no Rooms statistics, so there are no in-house guests and food comes out zero. Load the occupancy first."
+    "noStats": "This scenario has no Rooms statistics, so there are no in-house guests and food comes out zero. Load the occupancy first.",
+    "gross": "Menu gross",
+    "discount": "Discount",
+    "discountHint": "Channel commission on the share sold through agencies. Walk-ins carry none.",
+    "commissionable": "Commissionable (%)",
+    "serviceHint": "Charged to the guest and handed to the staff. Not hotel revenue."
   }
 }

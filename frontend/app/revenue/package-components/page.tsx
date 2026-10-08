@@ -10,7 +10,8 @@ import { bajarCuadros, type Cuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import {
   getScenarios, getPackageComponents, savePackageComponents, getChannelsConfig,
-  type Scenario, type PkgItem,
+  getFbPlan,
+  type Scenario, type PkgItem, type FbPlanConfigDTO,
 } from "@/lib/api";
 
 interface ItemRow {
@@ -27,20 +28,30 @@ interface Exp {
 const num = (v: string) => { const n = parseFloat((v || "").replace(/[$, ]/g, "")); return isNaN(n) ? 0 : n; };
 const fmtUsd = (n: number) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Referencia: cómo se compone el Full Board / Full Pension ($126 pre-SC). 10% service charge.
-const FULL_BOARD_MEALS = [
-  { meal: "Breakfast", base: 21 },
-  { meal: "Lunch", base: 42 },
-  { meal: "Dinner", base: 63 },
-];
-const SC_RATE = 0.10;
-// Planes de comida (paquetes más sencillos) — combinaciones de las comidas del Full Board
-const FULL_BOARD_PLANS = [
-  { plan: "planBreakfastOnly", meals: ["Breakfast"] },
-  { plan: "planLunchDinner", meals: ["Lunch", "Dinner"] },
-  { plan: "planFullBoard", meals: ["Breakfast", "Lunch", "Dinner"] },
-] as const;
-const mealBase = (name: string) => FULL_BOARD_MEALS.find(m => m.meal === name)?.base ?? 0;
+// ⚠️ Acá vivían el Full Board de $126 y sus tres planes de comida, ESCRITOS A
+// MANO. Son de Corcovado: un paquete todo-incluido que esta propiedad no vende.
+// Viajaban en el bundle a toda propiedad, así que Oxygen los veía como si
+// fueran suyos aunque no tenga una sola experiencia cargada — el mismo problema
+// que `app/api/semillas_api.py` describe para otras dos listas, al que ésta se
+// le había escapado.
+//
+// Owner, 2026-10-08: *«aprovechemos este tab para poner en promedio cuánto
+// desayuno, almuerzo y cena»* · *«no lo ponemos como paquete, sólo como cálculo
+// de food and beverage»*.
+//
+// Ahora los tres precios salen de `fb_plan_config` del escenario — la MISMA
+// fila que edita Planning → A&B. No hay copia: si se cambia allá, cambia acá.
+//
+// Owner, 2026-10-07, sobre el 10%: *«no se considera un ingreso, es un tip que
+// se colecta para los empleados pagado por el cliente, es tipo impuesto»*. Por
+// eso el servicio aparece en su propia columna y NO entra en «por pax»: esa
+// columna es ingreso del hotel y el servicio no lo es.
+//
+// El descuento efectivo del año no se recalcula acá: sale de los totales que
+// ya devolvió el backend (`descuento / food_bruto`). Repetir la cuenta sería
+// tener dos comisiones que el día que no coincidan nadie sabría cuál manda.
+const COMIDAS = ["desayuno", "almuerzo", "cena"] as const;
+type Comida = typeof COMIDAS[number];
 
 function emptyItem(): ItemRow {
   return { inclusion: "", unit: "per pax/night", unitPrice: "", enabled: true, notes: "", category: "Basic", qms: "1", qmd: "1", info: "" };
@@ -61,6 +72,24 @@ export default function PackageComponentsPage() {
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Precios y captura de A&B del escenario. `null` = esta propiedad todavía no
+   *  los cargó, y entonces no se muestra NADA en vez de los de otro hotel. */
+  const [fb, setFb] = useState<FbPlanConfigDTO | null>(null);
+  /** Descuento efectivo del año: lo que la agencia se llevó sobre el bruto.
+   *  Sale de los totales del backend, no se vuelve a calcular acá. */
+  const [descEf, setDescEf] = useState(0);
+
+  useEffect(() => {
+    if (!scenarioId) { setFb(null); setDescEf(0); return; }
+    (async () => {
+      try {
+        const d = await getFbPlan(scenarioId);
+        setFb(d.config);
+        const bruto = num(d.total?.food_bruto ?? "0");
+        setDescEf(bruto ? num(d.total?.descuento ?? "0") / bruto : 0);
+      } catch { setFb(null); setDescEf(0); }   // sin A&B el bloque no se dibuja
+    })();
+  }, [scenarioId]);
 
   useEffect(() => {
     (async () => {
@@ -282,35 +311,44 @@ export default function PackageComponentsPage() {
       { label: "10% SC", ancho: 14, formato: "usd2" as const },
       { label: "Total 10% Included", ancho: 18, formato: "usd2" as const },
     ];
-    cuadros.push({
-      titulo: t("fullBoardRef"),
-      subtitulo: t("fullBoardXlsSubtitle"),
-      hoja: "Full Board",
-      columnas: colsSc,
-      filas: [
-        ...FULL_BOARD_MEALS.map(m => ({
-          label: m.meal, valores: [m.base, m.base * SC_RATE, m.base * (1 + SC_RATE)],
-        })),
-        {
-          label: "TOTAL", es_total: true,
-          valores: [
-            FULL_BOARD_MEALS.reduce((s, m) => s + m.base, 0),
-            FULL_BOARD_MEALS.reduce((s, m) => s + m.base * SC_RATE, 0),
-            FULL_BOARD_MEALS.reduce((s, m) => s + m.base * (1 + SC_RATE), 0),
-          ],
-        },
-      ],
-    });
-    cuadros.push({
-      titulo: t("mealPlans"),
-      subtitulo: t("mealPlansXlsSubtitle"),
-      hoja: t("mealPlans"),
-      columnas: [{ ...colsSc[0], label: "Plan" }, ...colsSc.slice(1)],
-      filas: FULL_BOARD_PLANS.map(p => {
-        const base = p.meals.reduce((s, m) => s + mealBase(m), 0);
-        return { label: t(p.plan), valores: [base, base * SC_RATE, base * (1 + SC_RATE)] };
-      }),
-    });
+    // Los precios de A&B del escenario. Sin fila cargada no se baja la hoja:
+    // una hoja de Excel con los precios de otro hotel es peor que no tenerla.
+    if (fb) {
+      const sc = num(fb.servicio_pct);
+      const precio = (c: Comida) => num(fb[`precio_${c}` as keyof FbPlanConfigDTO] as string);
+      const captura = (c: Comida) => num(fb[`captura_${c}` as keyof FbPlanConfigDTO] as string);
+      const base = COMIDAS.reduce((s, c) => s + precio(c), 0);
+      const efectivo = COMIDAS.reduce((s, c) => s + precio(c) * captura(c), 0);
+      cuadros.push({
+        titulo: t("fbPrices"),
+        subtitulo: t("fbPricesHelp", { pct: (sc * 100).toFixed(1) }),
+        hoja: t("fbSheet"),
+        columnas: [
+          { label: t("fbMeal"), ancho: 22, formato: "texto" as const },
+          { label: t("fbPrice"), ancho: 14, formato: "usd2" as const },
+          { label: t("fbPerPax"), ancho: 15, formato: "usd2" as const },
+          { label: t("fbService"), ancho: 14, formato: "usd2" as const },
+        ],
+        filas: [
+          ...COMIDAS.map(c => ({
+            label: t(`meal_${c}`),
+            valores: [precio(c), precio(c) * captura(c), precio(c) * sc],
+          })),
+          {
+            label: t("fbIfAllThree"), es_total: true,
+            valores: [base, base, base * sc],
+          },
+          {
+            label: t("fbRealPerPax"), es_total: true,
+            valores: [0, efectivo, efectivo * sc],
+          },
+          {
+            label: t("fbNetPerPax"), es_total: true,
+            valores: [0, efectivo * (1 - descEf), 0],
+          },
+        ],
+      });
+    }
 
     try {
       await bajarCuadros("Package_Components", cuadros);
@@ -540,68 +578,77 @@ export default function PackageComponentsPage() {
             </>
           )}
 
-          {/* Referencia: composición del Full Board / Full Pension */}
-          <div style={{ marginTop: 28, maxWidth: 520, border: "0.5px solid var(--border-medium)", borderRadius: 8, padding: 16 }}>
-            <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>{t("fullBoardRef")}</div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
-              {t("fullBoardHelp")}
-            </div>
-            <table className="fin-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>Description</th>
-                  <th style={{ textAlign: "right" }}>Total</th>
-                  <th style={{ textAlign: "right" }}>10% SC</th>
-                  <th style={{ textAlign: "right" }}>Total 10% Included</th>
-                </tr>
-              </thead>
-              <tbody>
-                {FULL_BOARD_MEALS.map(m => (
-                  <tr key={m.meal}>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>{m.meal}</td>
-                    <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(m.base)}</td>
-                    <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(m.base * SC_RATE)}</td>
-                    <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(m.base * (1 + SC_RATE))}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
-                  <td style={{ textAlign: "left" }}>TOTAL</td>
-                  <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(FULL_BOARD_MEALS.reduce((s, m) => s + m.base, 0))}</td>
-                  <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(FULL_BOARD_MEALS.reduce((s, m) => s + m.base * SC_RATE, 0))}</td>
-                  <td className="mono" style={{ textAlign: "right", color: "var(--brand)" }}>{fmtUsd(FULL_BOARD_MEALS.reduce((s, m) => s + m.base * (1 + SC_RATE), 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div style={{ fontWeight: 600, color: "var(--text-primary)", margin: "16px 0 4px" }}>{t("mealPlans")}</div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>
-              {t("mealPlansHelp")}
-            </div>
-            <table className="fin-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>Plan</th>
-                  <th style={{ textAlign: "right" }}>Total</th>
-                  <th style={{ textAlign: "right" }}>10% SC</th>
-                  <th style={{ textAlign: "right" }}>Total 10% Included</th>
-                </tr>
-              </thead>
-              <tbody>
-                {FULL_BOARD_PLANS.map(p => {
-                  const base = p.meals.reduce((s, m) => s + mealBase(m), 0);
-                  return (
-                    <tr key={p.plan}>
-                      <td style={{ textAlign: "left", fontWeight: 500 }}>{t(p.plan)}</td>
-                      <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base)}</td>
-                      <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base * SC_RATE)}</td>
-                      <td className="mono" style={{ textAlign: "right", color: "var(--brand)" }}>{fmtUsd(base * (1 + SC_RATE))}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Precios de A&B del escenario — NO es un paquete: es el cálculo. */}
+          <div style={{ marginTop: 28, maxWidth: 620, border: "0.5px solid var(--border-medium)", borderRadius: 8, padding: 16 }}>
+            <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>{t("fbPrices")}</div>
+            {!fb ? (
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("fbNone")}</div>
+            ) : (() => {
+              const sc = num(fb.servicio_pct);
+              const precio = (c: Comida) => num(fb[`precio_${c}` as keyof FbPlanConfigDTO] as string);
+              const captura = (c: Comida) => num(fb[`captura_${c}` as keyof FbPlanConfigDTO] as string);
+              const base = COMIDAS.reduce((s, c) => s + precio(c), 0);
+              // Lo que de verdad entra por pax: cada comida por su captura.
+              const efectivo = COMIDAS.reduce((s, c) => s + precio(c) * captura(c), 0);
+              return (
+                <>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+                    {t("fbPricesHelp", { pct: (sc * 100).toFixed(1) })}
+                  </div>
+                  <table className="fin-table" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left" }}>{t("fbMeal")}</th>
+                        <th style={{ textAlign: "right" }}>{t("fbPrice")}</th>
+                        <th style={{ textAlign: "right" }}>{t("fbCapture")}</th>
+                        <th style={{ textAlign: "right" }}>{t("fbPerPax")}</th>
+                        <th style={{ textAlign: "right", color: "var(--text-secondary)" }}
+                          title={t("fbServiceHint")}>{t("fbService")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMIDAS.map(c => (
+                        <tr key={c}>
+                          <td style={{ textAlign: "left", fontWeight: 500 }}>{t(`meal_${c}`)}</td>
+                          <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(precio(c))}</td>
+                          <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{(captura(c) * 100).toFixed(1)}%</td>
+                          <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(precio(c) * captura(c))}</td>
+                          <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(precio(c) * sc)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
+                        <td style={{ textAlign: "left" }}>{t("fbIfAllThree")}</td>
+                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base)}</td>
+                        <td />
+                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base)}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(base * sc)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 700 }}>
+                        <td style={{ textAlign: "left" }}>{t("fbRealPerPax")}</td>
+                        <td colSpan={2} style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right", fontWeight: 400 }}>
+                          {t("fbRealHelp")}
+                        </td>
+                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(efectivo)}</td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(efectivo * sc)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 700 }}>
+                        <td style={{ textAlign: "left" }}>{t("fbNetPerPax")}</td>
+                        <td colSpan={2} style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right", fontWeight: 400 }}>
+                          {t("fbNetHelp", { pct: (descEf * 100).toFixed(2) })}
+                        </td>
+                        <td className="mono" style={{ textAlign: "right", color: "var(--brand)" }}>{fmtUsd(efectivo * (1 - descEf))}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                  <div style={{ fontSize: 11, color: "var(--text-disabled)", marginTop: 10 }}>
+                    {t("fbEditedIn")}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </>
       )}

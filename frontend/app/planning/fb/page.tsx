@@ -72,6 +72,7 @@ export default function FbPlanPage() {
   const [precio, setPrecio] = useState<Record<Comida, string>>({ desayuno: "0", almuerzo: "0", cena: "0" });
   const [captura, setCaptura] = useState<Record<Comida, string>>({ desayuno: "0", almuerzo: "0", cena: "0" });
   const [servicio, setServicio] = useState("10");
+  const [comisionable, setComisionable] = useState("0");
   const [bevPct, setBevPct] = useState("0");
   const [paxExt, setPaxExt] = useState<string[]>(Array(12).fill("0"));
   const [ticket, setTicket] = useState<string[]>(Array(12).fill("0"));
@@ -110,6 +111,7 @@ export default function FbPlanPage() {
           cena: String(n(d.config.captura_cena) * 100),
         });
         setServicio(String(n(d.config.servicio_pct) * 100));
+        setComisionable(String(n(d.config.pct_comisionable) * 100));
         setBevPct(String(n(d.config.bev_pct_food) * 100));
       }
       setPaxExt(d.meses.map(m => String(n(m.pax_externos))));
@@ -129,18 +131,27 @@ export default function FbPlanPage() {
     const porComida = Object.fromEntries(
       COMIDAS.map(c => [c, pax * n(precio[c]) * (n(captura[c]) / 100)]),
     ) as Record<Comida, number>;
-    const foodHosp = COMIDAS.reduce((a, c) => a + porComida[c], 0);
+    // 1 · bruto: precio de carta por la fracción que de verdad se consume
+    const bruto = COMIDAS.reduce((a, c) => a + porComida[c], 0);
+    // 2 · descuento: sólo sobre la parte que viaja con agencia, con el MISMO
+    //     factor de canal que netea la tarifa de habitación
+    const factor = m.net_factor ? n(m.net_factor) : 1;
+    const desc = bruto * (n(comisionable) / 100) * (1 - factor);
+    const foodHosp = bruto - desc;
+    // 3 · el externo paga en la puerta: sin comisión
     const foodExt = n(paxExt[i]) * n(ticket[i]);
-    const pre = foodHosp + foodExt;
-    const sc = pre * (n(servicio) / 100);
-    const food = pre + sc;
+    const food = foodHosp + foodExt;
+    // 4 · el servicio se cobra sobre la carta y NO suma al ingreso
+    const sc = (bruto + foodExt) * (n(servicio) / 100);
     const bev = food * (n(bevPct) / 100);
-    return { mes: i, pax, ...porComida, foodHosp, foodExt, pre, sc, food, bev, total: food + bev };
+    return { mes: i, pax, ...porComida, bruto, desc, foodHosp, foodExt, sc,
+             food, bev, total: food + bev };
   });
   const tot = filas.reduce((a, f) => ({
-    pax: a.pax + f.pax, foodHosp: a.foodHosp + f.foodHosp, foodExt: a.foodExt + f.foodExt,
+    pax: a.pax + f.pax, bruto: a.bruto + f.bruto, desc: a.desc + f.desc,
+    foodHosp: a.foodHosp + f.foodHosp, foodExt: a.foodExt + f.foodExt,
     sc: a.sc + f.sc, food: a.food + f.food, bev: a.bev + f.bev, total: a.total + f.total,
-  }), { pax: 0, foodHosp: 0, foodExt: 0, sc: 0, food: 0, bev: 0, total: 0 });
+  }), { pax: 0, bruto: 0, desc: 0, foodHosp: 0, foodExt: 0, sc: 0, food: 0, bev: 0, total: 0 });
 
   const bloqueado = !!data?.locked;
 
@@ -162,7 +173,7 @@ export default function FbPlanPage() {
       return { label: MONTHS[i], valores: [
         f.pax, n(paxExt[i]), n(ticket[i]), f.pax + n(paxExt[i]),
         ...COMIDAS.map(c => f[c] as number),
-        f.foodExt, f.sc, f.food, f.bev, f.total] };
+        f.bruto, -f.desc, f.foodExt, f.food, f.bev, f.total, f.sc] };
     };
     const cuerpo = filas.map((_f, i) => fila(i));
     const extTot = paxExt.reduce((a, v) => a + n(v), 0);
@@ -170,7 +181,8 @@ export default function FbPlanPage() {
       suma_de: filas.map((_f, i) => i),
       valores: [tot.pax, extTot, 0, tot.pax + extTot,
                 ...COMIDAS.map(c => filas.reduce((a, f) => a + (f[c] as number), 0)),
-                tot.foodExt, tot.sc, tot.food, tot.bev, tot.total] });
+                tot.bruto, -tot.desc, tot.foodExt, tot.food, tot.bev, tot.total,
+                tot.sc] });
     try {
       await bajarCuadros("AyB", [{
         titulo: t("title"),
@@ -183,11 +195,13 @@ export default function FbPlanPage() {
           { label: t("ticket"), ancho: 13, formato: "usd2" },
           { label: t("paxTotal"), ancho: 13, formato: "num" },
           ...COMIDAS.map(c => ({ label: t(`meal_${c}`), ancho: 14, formato: "usd2" as const })),
+          { label: t("gross"), ancho: 14, formato: "usd2" },
+          { label: t("discount"), ancho: 14, formato: "usd2" },
           { label: t("foodExternal"), ancho: 14, formato: "usd2" },
-          { label: t("service"), ancho: 13, formato: "usd2" },
           { label: t("food"), ancho: 14, formato: "usd2" },
           { label: t("beverage"), ancho: 14, formato: "usd2" },
           { label: t("total"), ancho: 15, formato: "usd2" },
+          { label: t("service"), ancho: 15, formato: "usd2" },
         ],
         filas: cuerpo,
       }]);
@@ -207,6 +221,7 @@ export default function FbPlanPage() {
         captura_almuerzo: n(captura.almuerzo) / 100,
         captura_cena: n(captura.cena) / 100,
         servicio_pct: n(servicio) / 100,
+        pct_comisionable: n(comisionable) / 100,
         bev_pct_food: n(bevPct) / 100,
       }, filas.map((f, i) => ({
         month: i + 1, pax_externos: Math.round(n(paxExt[i])), ticket_externos: n(ticket[i]),
@@ -305,8 +320,9 @@ export default function FbPlanPage() {
         borderRadius: 8, border: "1px solid var(--border-medium)", background: "var(--bg-surface)" }}>
         {COMIDAS.map(c => campo(t(`price_${c}`), precio[c], v => setPrecio(p => ({ ...p, [c]: v })), "$"))}
         {COMIDAS.map(c => campo(t(`capture_${c}`), captura[c], v => setCaptura(p => ({ ...p, [c]: v })), "%"))}
-        {campo(t("serviceCharge"), servicio, setServicio, "%")}
+        {campo(t("commissionable"), comisionable, setComisionable, "%")}
         {campo(t("bevPctFood"), bevPct, setBevPct, "%")}
+        {campo(t("serviceCharge"), servicio, setServicio, "%")}
       </div>
 
       {loading ? <div style={{ padding: 24 }}>{tc("loading")}</div> : (
@@ -320,11 +336,14 @@ export default function FbPlanPage() {
                 <th style={TH}>{t("ticket")}</th>
                 <th style={TH}>{t("paxTotal")}</th>
                 {COMIDAS.map(c => <th key={c} style={TH}>{t(`meal_${c}`)}</th>)}
+                <th style={TH}>{t("gross")}</th>
+                <th style={TH} title={t("discountHint")}>{t("discount")}</th>
                 <th style={TH}>{t("foodExternal")}</th>
-                <th style={TH}>{t("service")}</th>
                 <th style={TH}>{t("food")}</th>
                 <th style={TH}>{t("beverage")}</th>
                 <th style={TH}>{t("total")}</th>
+                <th style={{ ...TH, color: "var(--text-secondary)" }}
+                  title={t("serviceHint")}>{t("service")}</th>
               </tr>
             </thead>
             <tbody>
@@ -344,11 +363,15 @@ export default function FbPlanPage() {
                   </td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>{ent(f.pax + n(paxExt[i]))}</td>
                   {COMIDAS.map(c => <td key={c} style={TD}>{usd(f[c])}</td>)}
+                  <td style={TD}>{usd(f.bruto)}</td>
+                  <td style={{ ...TD, color: f.desc ? "var(--negative, #C0392B)" : "var(--text-secondary)" }}>
+                    {f.desc ? `−${usd(f.desc)}` : usd(0)}
+                  </td>
                   <td style={TD}>{usd(f.foodExt)}</td>
-                  <td style={{ ...TD, color: "var(--text-secondary)" }}>{usd(f.sc)}</td>
                   <td style={{ ...TD, fontWeight: 600 }}>{usd(f.food)}</td>
                   <td style={TD}>{usd(f.bev)}</td>
                   <td style={{ ...TD, fontWeight: 700 }}>{usd(f.total)}</td>
+                  <td style={{ ...TD, color: "var(--text-secondary)" }}>{usd(f.sc)}</td>
                 </tr>
               ))}
               <tr style={{ borderTop: "2px solid var(--border-medium)", fontWeight: 700 }}>
@@ -360,11 +383,15 @@ export default function FbPlanPage() {
                 {COMIDAS.map(c => (
                   <td key={c} style={TD}>{usd(filas.reduce((a, f) => a + f[c], 0))}</td>
                 ))}
+                <td style={TD}>{usd(tot.bruto)}</td>
+                <td style={{ ...TD, color: tot.desc ? "var(--negative, #C0392B)" : undefined }}>
+                  {tot.desc ? `−${usd(tot.desc)}` : usd(0)}
+                </td>
                 <td style={TD}>{usd(tot.foodExt)}</td>
-                <td style={TD}>{usd(tot.sc)}</td>
                 <td style={TD}>{usd(tot.food)}</td>
                 <td style={TD}>{usd(tot.bev)}</td>
                 <td style={TD}>{usd(tot.total)}</td>
+                <td style={{ ...TD, color: "var(--text-secondary)" }}>{usd(tot.sc)}</td>
               </tr>
             </tbody>
           </table>

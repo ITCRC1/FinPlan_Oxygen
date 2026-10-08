@@ -49,6 +49,24 @@ async def _pax_por_mes(db: AsyncSession, scenario_id: str) -> dict[int, Decimal]
     return {f.month: Decimal(str(f.guests or 0)) for f in filas}
 
 
+async def _factor_por_mes(db: AsyncSession, scenario_id: str) -> dict[int, Decimal]:
+    """Lo que le queda al hotel después de la comisión, mes a mes.
+
+    Es **el mismo** `compute_net_factor` que netea la tarifa de habitación. Que
+    A&B tuviera su propia comisión sería tener dos verdades sobre el mismo canal
+    y descubrirlo el día que no coincidan.
+
+    Un escenario sin canales devuelve factor 1 —nadie cobra comisión— en vez de
+    0, que dejaría el Food entero en cero sin que nadie lo haya pedido.
+    """
+    from app.models.sales_channel_config import SalesChannelConfig, compute_net_factor
+    canales = (await db.execute(select(SalesChannelConfig).where(
+        SalesChannelConfig.scenario_id == scenario_id))).scalars().all()
+    if not canales:
+        return {m: Decimal("1") for m in MESES}
+    return {m: compute_net_factor(canales, m) or Decimal("1") for m in MESES}
+
+
 async def _cargar(db: AsyncSession, scenario_id: str):
     cfg = (await db.execute(select(FbPlanConfig).where(
         FbPlanConfig.scenario_id == scenario_id))).scalar_one_or_none()
@@ -65,11 +83,13 @@ async def ver(scenario_id: str, db: AsyncSession = Depends(get_db),
         raise ErrorApi(404, "escenario.no_encontrado")
     cfg, meses = await _cargar(db, scenario_id)
     pax = await _pax_por_mes(db, scenario_id)
+    factor = await _factor_por_mes(db, scenario_id)
 
     filas, tot = [], {}
     for m in MESES:
-        r = calcular_mes(cfg, meses.get(m), pax.get(m, Decimal("0")))
-        filas.append({"month": m, **{k: _d(v) for k, v in r.items()}})
+        r = calcular_mes(cfg, meses.get(m), pax.get(m, Decimal("0")), factor[m])
+        filas.append({"month": m, "net_factor": _d(factor[m]),
+                      **{k: _d(v) for k, v in r.items()}})
         for k, v in r.items():
             tot[k] = tot.get(k, Decimal("0")) + Decimal(str(v))
 
@@ -81,6 +101,7 @@ async def ver(scenario_id: str, db: AsyncSession = Depends(get_db),
             **{f"precio_{c}": _d(getattr(cfg, f"precio_{c}")) for c in COMIDAS},
             **{f"captura_{c}": _d(getattr(cfg, f"captura_{c}")) for c in COMIDAS},
             "servicio_pct": _d(cfg.servicio_pct),
+            "pct_comisionable": _d(cfg.pct_comisionable),
             "bev_pct_food": _d(cfg.bev_pct_food),
         } if cfg else None,
         "meses": filas,
@@ -96,6 +117,7 @@ class ConfigBody(BaseModel):
     captura_almuerzo: Decimal = Decimal("0")
     captura_cena: Decimal = Decimal("0")
     servicio_pct: Decimal = Decimal("0.10")
+    pct_comisionable: Decimal = Decimal("0")
     bev_pct_food: Decimal = Decimal("0")
 
 
@@ -125,6 +147,11 @@ async def guardar(scenario_id: str, body: GuardarBody,
     if body.config.servicio_pct < 0 or body.config.servicio_pct > 1:
         raise ErrorApi(422, "fb.servicio_fuera_de_rango",
                        valor=float(body.config.servicio_pct))
+    # Comisionable es una fracción de la venta, igual que la captura: un 50
+    # escrito donde va 0,50 dejaría el Food en negativo.
+    if body.config.pct_comisionable < 0 or body.config.pct_comisionable > 1:
+        raise ErrorApi(422, "fb.comisionable_fuera_de_rango",
+                       valor=float(body.config.pct_comisionable))
     if body.config.bev_pct_food < 0:
         raise ErrorApi(422, "fb.bev_negativo", valor=float(body.config.bev_pct_food))
 
@@ -168,10 +195,11 @@ async def pasar_al_checkbook(scenario_id: str, db: AsyncSession = Depends(get_db
     if cfg is None:
         raise ErrorApi(422, "fb.sin_configuracion")
     pax = await _pax_por_mes(db, scenario_id)
+    factor = await _factor_por_mes(db, scenario_id)
 
     MES_COL = ["jan", "feb", "mar", "apr", "may", "jun",
                "jul", "aug", "sep", "oct", "nov", "dec"]
-    calc = {m: calcular_mes(cfg, meses.get(m), pax.get(m, Decimal("0")))
+    calc = {m: calcular_mes(cfg, meses.get(m), pax.get(m, Decimal("0")), factor[m])
             for m in MESES}
 
     actuales = {e.line.upper(): e for e in (await db.execute(

@@ -5290,14 +5290,26 @@ export async function setPaxGrid(
 export interface FbPlanConfigDTO {
   precio_desayuno: string; precio_almuerzo: string; precio_cena: string;
   captura_desayuno: string; captura_almuerzo: string; captura_cena: string;
-  servicio_pct: string; bev_pct_food: string;
+  /** Se cobra al cliente y se entrega al personal: NO suma al ingreso. */
+  servicio_pct: string;
+  /** Fracción de la comida del huésped que va en paquete de agencia. */
+  pct_comisionable: string;
+  bev_pct_food: string;
 }
 export interface FbPlanMesDTO {
   month: number;
   desayuno: string; almuerzo: string; cena: string;
-  food_hospedados: string; food_externos: string; food_pre_servicio: string;
-  servicio: string; food: string; beverage: string; total: string;
+  /** Precio de carta × captura, antes de cualquier descuento. */
+  food_bruto: string;
+  /** Lo que se lleva la agencia sobre la parte comisionable. */
+  descuento: string;
+  food_hospedados: string; food_externos: string;
+  /** Informativo: se recauda para el personal, no es ingreso. */
+  servicio: string;
+  food: string; beverage: string; total: string;
   pax_hospedados: string; pax_externos: string; pax_total: string;
+  /** El mismo factor neto de canal que netea la tarifa de habitación. */
+  net_factor: string;
 }
 export interface FbPlanResponse {
   scenario_id: string;
