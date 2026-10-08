@@ -187,9 +187,26 @@ async def pasar_al_checkbook(scenario_id: str, db: AsyncSession = Depends(get_db
 
     Sólo esas dos líneas. Las demás del checkbook —Spa, Tours, Laundry— son de
     otro dueño y no tienen por qué moverse porque acá se cambió un precio.
+
+    ## ⚠️ No en modo `drivers`, y el motivo costó un presupuesto
+
+    El 2026-10-08 se cargó el A&B de Oxygen con este botón, se recalculó, y las
+    dos líneas quedaron en **cero**. No falló nada: en `drivers` el recálculo
+    baja el ingreso derivado al sub-mayor
+    (`recalculate.sincronizar_ingreso_derivado`), y escribió encima.
+
+    Desde entonces el plan de A&B **es** un driver
+    (`recalculate.aplicar_plan_ab`): en ese modo el número viaja solo en cada
+    recálculo y este botón no tiene nada que hacer. Si igual escribiera, estaría
+    ofreciendo guardar algo que se borra sin avisar — que es la peor forma de
+    estar mal, porque el total sigue cuadrando.
     """
     await candado(db, scenario_id)
     from app.models.revenue_entry import RevenueEntry
+
+    esc_modo = await db.get(Scenario, scenario_id)
+    if getattr(esc_modo, "revenue_source", "drivers") != "checkbook":
+        raise ErrorApi(409, "fb.es_driver_no_checkbook")
 
     cfg, meses = await _cargar(db, scenario_id)
     if cfg is None:

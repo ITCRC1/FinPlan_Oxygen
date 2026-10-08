@@ -41,7 +41,7 @@ from app.models.actual_pl_line import ActualPLLine
 from app.models.mapping import AccountMapping, ReportLineConfig
 
 from app.models.room_type_config import RoomTypeConfig
-from app.models.sales_channel_config import SalesChannelConfig
+from app.models.sales_channel_config import SalesChannelConfig, compute_net_factor
 from app.models.rate_card import RateCard
 from app.models.occupancy_budget import OccupancyBudget
 from app.models.package_config import PackageConfig
@@ -171,7 +171,61 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
             other_revenues=[ot for ot in other_revenues if ot.month == month],
             room_type_units=room_type_units,
         )
+    await aplicar_plan_ab(session, scenario, results, channels)
     return results
+
+
+async def aplicar_plan_ab(session, scenario, results, channels) -> bool:
+    """FOOD y BEVERAGE desde Planning -> A&B, cuando la propiedad lo usa.
+
+    ## Por que esto va en el DRIVER y no en un boton
+
+    El 2026-10-08 se cargo el A&B de Oxygen con el boton «pasar al checkbook»,
+    se recalculo, y **las dos lineas quedaron en cero**. No fallo nada: en modo
+    `drivers` el recalculo baja el ingreso derivado al sub-mayor
+    (`sincronizar_ingreso_derivado`, abajo), y el derivado de A&B salia de
+    `package_configs` — el Full Board de Corcovado, que Oxygen no vende y tiene
+    vacio. Escribio los ceros del modelo encima de lo cargado.
+
+    O sea que el boton ofrecia escribir algo que el siguiente recalculo borraba,
+    y lo borraba en silencio. Es exactamente el modo de falla que el docstring
+    de `sincronizar_ingreso_derivado` describe para el caso contrario: *«el P&L
+    seguiria cuadrando y no habria forma de notarlo»*.
+
+    El arreglo no es volver a escribir el checkbook: es que el plan de A&B **sea
+    un driver**, igual que las tarifas y la ocupacion lo son de Rooms. Asi viaja
+    solo en cada recalculo y no depende de que alguien se acuerde de un boton.
+
+    ## Es aditivo y no le pisa el A&B a nadie
+
+    Sin fila en `fb_plan_config` esto NO toca nada y el Full Board sigue
+    mandando donde se use: la condicion es que exista el plan, no la propiedad
+    ni el año. Corcovado, que vende paquete, no cambia.
+
+    ## Los pax son los del modelo vivo
+
+    Se usa `result.guests` —tarifas x ocupacion— y no `scenario_stats`, aunque
+    la pantalla lea los stats: el mismo recalculo los sincroniza despues, asi
+    que despues de recalcular dicen lo mismo. Leer los stats aca haria que el
+    P&L dependiera de la ultima sincronizacion en vez del modelo.
+
+    Devuelve si aplico, para que la prueba pueda distinguir «no habia plan» de
+    «el plan daba cero».
+    """
+    from app.models.fb_plan import FbPlanConfig, FbPlanMes, calcular_mes
+
+    cfg = (await session.execute(select(FbPlanConfig).where(
+        FbPlanConfig.scenario_id == scenario.id))).scalar_one_or_none()
+    if cfg is None:
+        return False
+    meses = {m.month: m for m in (await session.execute(select(FbPlanMes).where(
+        FbPlanMes.scenario_id == scenario.id))).scalars().all()}
+    for mes, r in results.items():
+        nf = compute_net_factor(channels, mes) if channels else Decimal("1")
+        calc = calcular_mes(cfg, meses.get(mes), r.guests, nf or Decimal("1"))
+        r.food = Decimal(str(calc["food"])).quantize(Decimal("0.01"))
+        r.beverage = Decimal(str(calc["beverage"])).quantize(Decimal("0.01"))
+    return True
 
 
 def revenue_line_dict(r: RevenueResult) -> dict[str, Decimal]:

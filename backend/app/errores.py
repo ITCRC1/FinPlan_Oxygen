@@ -779,6 +779,11 @@ MENSAJES: dict[str, dict[str, str]] = {
     "fb.sin_configuracion": {
         "es": "Este escenario todavía no tiene precios ni captura de A&B. Llenalos y guardá antes de pasarlos al checkbook.",
         "en": "This scenario has no F&B prices or capture rates yet. Fill them in and save before moving them to the checkbook."},
+    # El boton que escribia algo que el recalculo borraba. Ver
+    # `recalculate.aplicar_plan_ab`: en `drivers` el A&B ya viaja solo.
+    "fb.es_driver_no_checkbook": {
+        "es": "En este escenario el A&B viaja solo: cada recálculo lo recalcula desde esta pantalla y lo baja al checkbook. No hace falta pasarlo a mano — y si se pasara, el siguiente recálculo lo sobrescribiría.",
+        "en": "In this scenario F&B flows on its own: every recalculation rebuilds it from this screen and writes it to the checkbook. There is nothing to move by hand — and anything moved would be overwritten by the next recalculation."},
     "fb.recalcular_despues": {
         "es": "Food y Beverage quedaron escritos en el checkbook. Recalculá para que el P&L los tome.",
         "en": "Food and Beverage were written to the checkbook. Recalculate so the P&L picks them up."},
