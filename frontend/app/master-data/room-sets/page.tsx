@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros, type Cuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const HOTEL = HOTEL_ID;
 const GOLD = "#c8a24a";
@@ -365,7 +366,7 @@ export default function RoomSetsPage() {
                           </td>
                         ))}
                         <td style={{ ...tdNum, fontWeight: 700 }}>
-                          {money(Array.from({ length: 12 }, (_, m) => montoMes(d.dept_code, m)).reduce((a, b) => a + b, 0))}
+                          <Monto>{money(Array.from({ length: 12 }, (_, m) => montoMes(d.dept_code, m)).reduce((a, b) => a + b, 0))}</Monto>
                         </td>
                       </tr>
                     ))}
@@ -381,7 +382,7 @@ export default function RoomSetsPage() {
                         </td>
                       ))}
                       <td style={{ ...tdNum, borderTop: "2px solid var(--border-medium)", fontWeight: 700 }}>
-                        {money(Array.from({ length: 12 }, (_, m) => restoMes(m)).reduce((a, b) => a + b, 0))}
+                        <Monto>{money(Array.from({ length: 12 }, (_, m) => restoMes(m)).reduce((a, b) => a + b, 0))}</Monto>
                       </td>
                     </tr>
                   </tbody>

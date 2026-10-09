@@ -9,6 +9,7 @@ import {
   getScenarios, getPackagesConfig, savePackages, updateComponentLabel,
   type Scenario, type PackageComponent,
 } from "@/lib/api";
+import InputMoneda from "@/components/InputMoneda";
 
 interface CompEdit { component: string; label: string; rate: string; comm: boolean; }
 
@@ -209,10 +210,9 @@ export default function PackagesPage() {
                 </td>
                 <td style={td}>
                   <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
-                    <span style={{ color: "var(--text-disabled)", fontSize: 11 }}>$</span>
-                    <input className="fin-input mono" value={c.rate} disabled={sel?.is_locked}
-                      onChange={e => setRate(i, e.target.value)} onFocus={e => e.target.select()}
-                      style={{ width: 90, textAlign: "right" }} />
+                    <InputMoneda value={c.rate} disabled={sel?.is_locked}
+                      onChange={v => setRate(i, v)}
+                      style={{ width: 104 }} />
                   </div>
                 </td>
                 <td style={{ ...td, textAlign: "center" }}>

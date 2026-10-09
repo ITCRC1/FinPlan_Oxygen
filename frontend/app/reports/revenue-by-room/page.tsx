@@ -9,6 +9,7 @@ import {
   getScenarios, getRevenueByRoomType, rtLabel,
   type Scenario, type RevenueByRoomType, type RoomTypeRow,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
@@ -170,7 +171,7 @@ export default function RevenueByRoomPage() {
                   <tr key={r.room_type_id} style={{ borderBottom:"1px solid var(--border-light, rgba(255,255,255,0.05))" }}>
                     <td style={{ padding:"5px 10px", fontSize:12, color:"var(--text-primary)" }}>{rtLabel(r.room_type_code, r.room_type_name)}</td>
                     <td style={td}>{r.units}</td><td style={td}>{int(r.nights_available)}</td><td style={td}>{int(r.nights_occupied)}</td>
-                    <td style={td}>{pct(r.occupancy_pct)}</td><td style={{ ...td, fontWeight:600 }}>{usd0(r.revenue)}</td>
+                    <td style={td}>{pct(r.occupancy_pct)}</td><td style={{ ...td, fontWeight:600 }}><Monto>{usd0(r.revenue)}</Monto></td>
                     <td style={td}>{usd2(r.adr)}</td><td style={td}>{int(r.pax)}</td>
                     <td style={{ ...td, color:"var(--brand)" }}>{pct(r.pct_of_total ?? 0)}</td>
                   </tr>
@@ -178,7 +179,7 @@ export default function RevenueByRoomPage() {
                 <tr style={{ borderTop:"2px solid var(--border-medium)", fontWeight:700 }}>
                   <td style={{ padding:"6px 10px", fontSize:12 }}>TOTAL</td>
                   <td style={td}>{totals.units}</td><td style={td}>{int(totals.na)}</td><td style={td}>{int(totals.no)}</td>
-                  <td style={td}>{pct(totals.na?totals.no/totals.na:0)}</td><td style={td}>{usd0(totals.rev)}</td>
+                  <td style={td}>{pct(totals.na?totals.no/totals.na:0)}</td><td style={td}><Monto>{usd0(totals.rev)}</Monto></td>
                   <td style={td}>{usd2(totals.no?totals.rev/totals.no:0)}</td><td style={td}>{int(totals.pax)}</td><td style={td}>100%</td>
                 </tr>
               </tbody>

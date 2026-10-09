@@ -20,6 +20,7 @@ import { mergeDepts, deptName, cargarDepartamentos, type CwlDept } from "@/lib/c
 import { money2 } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 /** Llaves de mes del backend, en el mismo orden que MONTHS. `as const` para
@@ -71,7 +72,7 @@ function NumCell({ value, onSave, cerrado, onPegar }: {
       <td className="mono" title={TITULO_CERRADO}
           style={{ textAlign: "right", padding: "2px 6px", minWidth: 78,
                    ...CELDA_CERRADA }}>
-        {fmtUsd(value)}
+        <Monto>{fmtUsd(value)}</Monto>
       </td>
     );
   }

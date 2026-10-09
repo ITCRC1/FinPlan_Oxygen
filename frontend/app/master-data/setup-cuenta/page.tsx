@@ -29,6 +29,7 @@ import {
   getSetupCuenta, setupCuentaExcelUrl,
   type SetupCuenta, type SetupFila, type SetupDesalineada,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const BTN: React.CSSProperties = {
   padding: "9px 18px", borderRadius: 6, cursor: "pointer",
@@ -174,7 +175,7 @@ function Desalineada({ d, anios }: { d: SetupDesalineada; anios: number[] }) {
                     if (c.estado === "usa") return (
                       <td key={a} style={{
                         ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums",
-                      }}>{money(c.monto)}</td>
+                      }}><Monto>{money(c.monto)}</Monto></td>
                     );
                     // El hueco que importa: el departamento estaba vivo ese año
                     // y la cuenta igual no cayó en esta línea.

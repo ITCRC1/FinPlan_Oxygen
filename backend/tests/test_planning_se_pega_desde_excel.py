@@ -67,8 +67,15 @@ def _cuerpo_del_map(src: str, desde: int) -> str:
     return src[desde:desde + 2000]
 
 
+#: Lo que cuenta como celda editable. ⚠️ `InputMoneda` entra en la lista: desde
+#: que las grillas de dinero lo usan (2026-10-08), buscar solo `<input` las
+#: daba por NO editables y esta guarda pasaba sin revisar nada — el peor
+#: resultado posible para una prueba, que es decir que si sin haber mirado.
+_CELDAS = ("<input", "<InputMoneda")
+
+
 def _tiene_grilla_editable(src: str) -> bool:
-    """¿Hay un `<input>` dentro del recorrido de meses, no cerca de el?
+    """¿Hay una celda editable dentro del recorrido de meses, no cerca de el?
 
     Es la forma que tienen todas: `MONTHS.map(...)` o `MONTH_KEYS.map(...)` con
     un campo adentro. No alcanza con contar inputs —casi toda pantalla tiene el
@@ -76,12 +83,14 @@ def _tiene_grilla_editable(src: str) -> bool:
     esta en las de solo lectura.
     """
     for m in re.finditer(r"(MONTHS|MESES|MONTH_KEYS|length: 12)\W*?\.map\(", src):
-        if "<input" in _cuerpo_del_map(src, m.end() - 1):
+        cuerpo = _cuerpo_del_map(src, m.end() - 1)
+        if any(c in cuerpo for c in _CELDAS):
             return True
     # Las grillas que recorren su propio arreglo de doce (`capture.map`,
     # `pct3.map`) se reconocen por el estado, no por el nombre del mes.
     for m in re.finditer(r"(pct\d|capture|precio|vals)\.map\(", src):
-        if "<input" in _cuerpo_del_map(src, m.end() - 1):
+        cuerpo = _cuerpo_del_map(src, m.end() - 1)
+        if any(c in cuerpo for c in _CELDAS):
             return True
     return False
 

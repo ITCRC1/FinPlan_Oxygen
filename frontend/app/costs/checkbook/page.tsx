@@ -21,6 +21,7 @@ import { mergeDepts, deptName, cargarDepartamentos, type CwlDept } from "@/lib/c
 import { money2 } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 /** Llaves de mes como vienen del backend, en el mismo orden que MONTHS. */
@@ -86,7 +87,7 @@ function NumCell({
   if (cerrado) return (
     <td className="mono" title={TITULO_CERRADO}
         style={{ textAlign: "right", padding: "2px 6px", ...CELDA_CERRADA }}>
-      {fmtUsd(value)}
+      <Monto>{fmtUsd(value)}</Monto>
     </td>
   );
 
@@ -745,11 +746,11 @@ export default function CostsCheckbookPage() {
                     </td>
                     {summary.map(m => (
                       <td key={m.month} className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                        {fmtUsd(m.total_cos)}
+                        <Monto>{fmtUsd(m.total_cos)}</Monto>
                       </td>
                     ))}
                     <td className="mono" style={{ textAlign: "right", fontWeight: 700 }}>
-                      {fmtUsd(String(summary.reduce((s, m) => s + parseFloat(m.total_cos || "0"), 0)))}
+                      <Monto>{fmtUsd(String(summary.reduce((s, m) => s + parseFloat(m.total_cos || "0"), 0)))}</Monto>
                     </td>
                   </tr>
 
@@ -902,7 +903,7 @@ function MonthPctCell({
   if (cerrado) return (
     <td className="mono" title={TITULO_CERRADO}
         style={{ textAlign: "right", padding: "2px 6px", ...CELDA_CERRADA }}>
-      {fmtUsd(amount)}
+      <Monto>{fmtUsd(amount)}</Monto>
     </td>
   );
   function commit() {

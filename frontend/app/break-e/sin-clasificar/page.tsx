@@ -32,6 +32,7 @@ import { getBeSinClasificar } from "@/lib/api";
 import { bajarCuadros } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import { BarraContexto, useContextoBE, useVigencia, usd } from "../_contexto";
+import Monto from "@/components/Monto";
 
 type Datos = Awaited<ReturnType<typeof getBeSinClasificar>>;
 
@@ -160,7 +161,7 @@ export default function SinClasificar() {
                       {x.account || "—"}
                     </td>
                     <td style={IZQ}>{x.pl_line || <i>{t("sinLinea")}</i>}</td>
-                    <td style={TD}>{usd(x.amount)}</td>
+                    <td style={TD}><Monto>{usd(x.amount)}</Monto></td>
                   </tr>
                 ))}
                 {!d.sin_regla.length && (

@@ -7,6 +7,7 @@ import {
   type CapitalDetail, type CapitalProjectRow, type CapitalPatch,
 } from "@/lib/api";
 import { GOLD } from "./bloques";
+import Monto from "@/components/Monto";
 
 const MESES = ["jan", "feb", "mar", "apr", "may", "jun",
   "jul", "aug", "sep", "oct", "nov", "dec"] as const;
@@ -220,7 +221,7 @@ export function CapitalDetalle({ scenarioId, etiqueta }: { scenarioId: string; e
                         </td>
                       ))}
                       <td className="mono" style={{ padding: "3px 6px", textAlign: "right", fontWeight: 800 }}>
-                        {dinero(row.total)}
+                        <Monto>{dinero(row.total)}</Monto>
                       </td>
                       <td className="no-print" style={{ padding: "3px 4px", textAlign: "center" }}>
                         <button onClick={() => borrar(row)} title={t("delete")}
@@ -255,7 +256,7 @@ export function CapitalDetalle({ scenarioId, etiqueta }: { scenarioId: string; e
               <td style={{ padding: "9px 6px", fontWeight: 800 }}>{t("totalInvestment")}</td>
               {MESES.map(m => (
                 <td key={m} className="mono" style={{ padding: "9px 4px", textAlign: "right", fontWeight: 800 }}>
-                  {dinero(data.months[m] ?? 0)}
+                  <Monto>{dinero(data.months[m] ?? 0)}</Monto>
                 </td>
               ))}
               <td className="mono" style={{ padding: "9px 6px", textAlign: "right", fontWeight: 800, color: GOLD }}>

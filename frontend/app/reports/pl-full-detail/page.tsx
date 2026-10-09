@@ -12,6 +12,7 @@ import {
   type Scenario, type PLFullDetail, type PLDetalleFila, type PLDetalleSet,
   type ClubMembershipFila,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const HOTEL = HOTEL_ID;
 const GOLD = "#c8a24a";
@@ -174,9 +175,9 @@ function BloqueKPIs({ sets, consolidado }: { sets: PLDetalleSet[]; consolidado: 
                 <td style={tdNum}>{disp ? Math.round(disp).toLocaleString("en-US") : ""}</td>
                 <td style={tdNum}>{ocup ? Math.round(ocup).toLocaleString("en-US") : ""}</td>
                 <td style={tdNum}>{pct1(s.ocupacion_anual)}</td>
-                <td style={tdNum}>{money(s.adr_anual)}</td>
-                <td style={tdNum}>{money(s.revpar_anual)}</td>
-                <td style={tdNum}>{money(s.revenue_anual)}</td>
+                <td style={tdNum}><Monto>{money(s.adr_anual)}</Monto></td>
+                <td style={tdNum}><Monto>{money(s.revpar_anual)}</Monto></td>
+                <td style={tdNum}><Monto>{money(s.revenue_anual)}</Monto></td>
               </tr>
             );
           })}
@@ -436,10 +437,10 @@ export default function PLFullDetailPage() {
                 <span style={{ marginLeft: "auto", display: "flex", gap: 18, fontWeight: 400,
                                fontSize: 12, color: "var(--text-secondary)",
                                fontVariantNumeric: "tabular-nums" }}>
-                  <span>{t("revenue")} {money(b.ingreso_anual) || "—"}</span>
-                  <span>{t("expenses")} {money(b.gasto_anual) || "—"}</span>
+                  <span>{t("revenue")} <Monto>{money(b.ingreso_anual) || "—"}</Monto></span>
+                  <span>{t("expenses")} <Monto>{money(b.gasto_anual) || "—"}</Monto></span>
                   <span style={{ ...rojoSiNegativo(b.utilidad_anual), fontWeight: 700 }}>
-                    {t("profit")} {money(b.utilidad_anual) || "—"}
+                    {t("profit")} <Monto>{money(b.utilidad_anual) || "—"}</Monto>
                   </span>
                 </span>
               </button>

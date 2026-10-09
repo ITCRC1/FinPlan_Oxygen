@@ -11,6 +11,7 @@ import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from
 import { celdasPegadas, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
+import InputMoneda from "@/components/InputMoneda";
 import { useTranslations } from "next-intl";
 import { money2 } from "@/lib/fmt";
 import { useEffect, useState, useCallback } from "react";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS: MonthKey[] = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -575,22 +577,20 @@ export default function RevenueCheckbookPage() {
                           consultando. El pegado tambien se corta: un paste que
                           arranca en un mes abierto podria desbordar sobre uno
                           cerrado y perderse entero al guardar. */}
-                      <input
-                        className="fin-input mono"
+                      <InputMoneda
                         value={r[mk]}
                         disabled={sel?.is_locked}
                         readOnly={cerrado(mi + 1)}
-                        onChange={e => setCell(ri, mk, e.target.value)}
+                        onChange={v => setCell(ri, mk, v)}
                         onPaste={e => { if (cerrado(mi + 1)) { e.preventDefault(); return; }
                                         handlePaste(ri, mi, e); }}
-                        onFocus={e => e.target.select()}
-                        style={{ width: "100%", textAlign: "right", padding: "3px 4px",
+                        style={{ width: "100%", padding: "3px 4px",
                                  ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}
                       />
                     </td>
                   ))}
                   <td className="mono" style={{ textAlign: "right", fontWeight: 600, borderLeft: "1px solid var(--border)" }}>
-                    {fmtUsd(rowTotal(r))}
+                    <Monto>{fmtUsd(rowTotal(r))}</Monto>
                   </td>
                 </tr>
               ))}
@@ -599,9 +599,9 @@ export default function RevenueCheckbookPage() {
               <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
                 <td style={{ textAlign: "left" }}>TOTAL REVENUE</td>
                 {monthTotals.map((t, i) => (
-                  <td key={i} className="mono" style={{ textAlign: "right" }}>{fmtUsd(t)}</td>
+                  <td key={i} className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(t)}</Monto></td>
                 ))}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>{fmtUsd(grandTotal)}</td>
+                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}><Monto>{fmtUsd(grandTotal)}</Monto></td>
               </tr>
             </tfoot>
           </table>

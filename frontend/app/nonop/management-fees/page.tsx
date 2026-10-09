@@ -21,6 +21,7 @@ import {
   getNonOp, replaceNonOpLines,
   type Scenario, type NonOpBulkRow,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"] as const;
@@ -342,7 +343,7 @@ export default function ManagementFeesPage() {
                   {man3.map((v, i) => (
                     <td key={i} style={{ textAlign: "right" }}>
                       {variosDetalles["MGMT_FEE_3"] ? (
-                        <span className="mono" style={{ fontSize: 11 }}>{fmtUsd(v)}</span>
+                        <span className="mono" style={{ fontSize: 11 }}><Monto>{fmtUsd(v)}</Monto></span>
                       ) : (
                         <input type="number" value={v} style={numInp}
                           onChange={e => setMan3(p => p.map((x, j) => j === i ? Number(e.target.value) : x))} />
@@ -391,7 +392,7 @@ export default function ManagementFeesPage() {
                   {man5.map((v, i) => (
                     <td key={i} style={{ textAlign: "right" }}>
                       {variosDetalles["MGMT_FEE_5_ROYALTIES"] ? (
-                        <span className="mono" style={{ fontSize: 11 }}>{fmtUsd(v)}</span>
+                        <span className="mono" style={{ fontSize: 11 }}><Monto>{fmtUsd(v)}</Monto></span>
                       ) : (
                         <input type="number" value={v} style={numInp}
                           onChange={e => setMan5(p => p.map((x, j) => j === i ? Number(e.target.value) : x))} />
@@ -407,7 +408,7 @@ export default function ManagementFeesPage() {
                 <tr className="total">
                   <td style={{ fontWeight: 700, color: "var(--text-primary)" }}>Total Management Fees</td>
                   {revByMonth.map((_, i) => (
-                    <td key={i} className="mono" style={{ textAlign: "right", fontWeight: 700 }}>{fmtUsd(fee3(i) + fee5(i))}</td>
+                    <td key={i} className="mono" style={{ textAlign: "right", fontWeight: 700 }}><Monto>{fmtUsd(fee3(i) + fee5(i))}</Monto></td>
                   ))}
                   <td className="mono" style={{ textAlign: "right", fontWeight: 700, color: "var(--positive)" }}>{fmtUsd(totalFee3 + totalFee5)}</td>
                 </tr>
@@ -443,7 +444,7 @@ export default function ManagementFeesPage() {
                   {manRes.map((v, i) => (
                     <td key={i} style={{ textAlign: "right" }}>
                       {variosDetalles["CAPITAL_RESERVE"] ? (
-                        <span className="mono" style={{ fontSize: 11 }}>{fmtUsd(v)}</span>
+                        <span className="mono" style={{ fontSize: 11 }}><Monto>{fmtUsd(v)}</Monto></span>
                       ) : (
                         <input type="number" value={v} style={numInp}
                           onChange={e => setManRes(p => p.map((x, j) => j === i ? Number(e.target.value) : x))} />

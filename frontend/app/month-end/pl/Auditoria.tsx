@@ -23,6 +23,7 @@
  */
 import { sembrarTres } from "@/lib/escenarioPreferido";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import Monto from "@/components/Monto";
 
 import { getAuditoria, type Auditoria as Datos, type AuditoriaCuadre,
          type AuditoriaFila, type Scenario } from "@/lib/api";
@@ -352,7 +353,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
               </div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 800,
                                              color, lineHeight: 1.15 }}>
-                {usd(valor)}
+                <Monto>{usd(valor)}</Monto>
               </div>
             </div>
           ))}
@@ -580,7 +581,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                         }}>
                           {f.linea || "⚠ no cae en ninguna línea"}
                         </td>
-                        <td style={TD}>{usd(f.monto)}</td>
+                        <td style={TD}><Monto>{usd(f.monto)}</Monto></td>
                       </tr>
                       </Fragment>
                     ))}
@@ -594,7 +595,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                   </td>
                   <td style={{ ...TD, fontWeight: 800, paddingTop: 5,
                                borderTop: "1px solid var(--border-medium)" }}>
-                    {usd(d.total)}
+                    <Monto>{usd(d.total)}</Monto>
                   </td>
                 </tr>
               </Fragment>
@@ -625,11 +626,11 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
               <tr key={String(d.dept_code)}>
                 <td style={TDL}>{d.dept_code} · {d.dept_name}</td>
                 {columnas.map(c => (
-                  <td key={c} style={TD}>{usd(Number(d[c] ?? 0))}</td>
+                  <td key={c} style={TD}><Monto>{usd(Number(d[c] ?? 0))}</Monto></td>
                 ))}
                 <td style={{ ...TD, fontWeight: 700,
                              borderLeft: "2px solid var(--border-medium)" }}>
-                  {usd(d.total_gasto)}
+                  <Monto>{usd(d.total_gasto)}</Monto>
                 </td>
               </tr>
             ))}
@@ -638,10 +639,10 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                            borderTop: "1px solid var(--border-medium)" }}>
                 <td style={TDL}>TOTAL</td>
                 {columnas.map(c => (
-                  <td key={c} style={TD}>{usd(datos.totales[c] ?? 0)}</td>
+                  <td key={c} style={TD}><Monto>{usd(datos.totales[c] ?? 0)}</Monto></td>
                 ))}
                 <td style={{ ...TD, borderLeft: "2px solid var(--border-medium)" }}>
-                  {usd(datos.totales.total_gasto ?? 0)}
+                  <Monto>{usd(datos.totales.total_gasto ?? 0)}</Monto>
                 </td>
               </tr>
             )}

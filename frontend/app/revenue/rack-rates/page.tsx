@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import InputMoneda from "@/components/InputMoneda";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS: MonthKey[] = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -209,19 +210,13 @@ export default function RackRatesPage() {
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{rtLabel(r.code, r.name)}</td>
                   {MONTH_KEYS.map((mk, mi) => (
                     <td key={mk} style={{ padding: "1px 2px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <span style={{ color: "var(--text-disabled)", fontSize: 11 }}>$</span>
-                        <input
-                          className="fin-input mono"
-                          value={r[mk]}
-                          disabled={sel?.is_locked}
-                          onChange={e => setCell(ri, mk, e.target.value)}
-                          onBlur={() => blurCell(ri, mk)}
-                          onPaste={e => handlePaste(ri, mi, e)}
-                          onFocus={e => e.target.select()}
-                          style={{ flex: 1, minWidth: 0, textAlign: "right", padding: "3px 4px" }}
-                        />
-                      </div>
+                      <InputMoneda
+                        value={r[mk]}
+                        disabled={sel?.is_locked}
+                        onChange={v => { setCell(ri, mk, v); blurCell(ri, mk); }}
+                        onPaste={e => handlePaste(ri, mi, e)}
+                        style={{ width: "100%", padding: "3px 4px" }}
+                      />
                     </td>
                   ))}
                 </tr>

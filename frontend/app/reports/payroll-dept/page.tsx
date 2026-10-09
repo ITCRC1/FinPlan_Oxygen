@@ -9,6 +9,7 @@ import {
   getScenarios, getPayrollDeptReport,
   type Scenario, type PayrollDeptReport,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
 function scnLabel(s: Scenario) {
@@ -121,14 +122,14 @@ export default function PayrollDeptReportPage() {
                   <tr key={r.dept_code} style={{ borderBottom:"1px solid var(--border-light, rgba(255,255,255,0.05))" }}>
                     <td style={{ padding:"5px 12px", fontSize:12, color:"var(--text-primary)" }}>{r.dept_name}</td>
                     <td style={td}>{r.headcount}</td><td style={td}>{fte(r.fte_avg)}</td>
-                    <td style={td}>{usd0(r.sw_annual)}</td><td style={{ ...td, fontWeight:600 }}>{usd0(r.total_annual)}</td>
+                    <td style={td}><Monto>{usd0(r.sw_annual)}</Monto></td><td style={{ ...td, fontWeight:600 }}><Monto>{usd0(r.total_annual)}</Monto></td>
                   </tr>
                 ))}
                 {t && (
                   <tr style={{ borderTop:"2px solid var(--border-medium)", fontWeight:700 }}>
                     <td style={{ padding:"6px 12px", fontSize:12 }}>TOTAL</td>
                     <td style={td}>{t.headcount}</td><td style={td}>{fte(t.fte_avg)}</td>
-                    <td style={td}>{usd0(t.sw_annual)}</td><td style={td}>{usd0(t.total_annual)}</td>
+                    <td style={td}><Monto>{usd0(t.sw_annual)}</Monto></td><td style={td}><Monto>{usd0(t.total_annual)}</Monto></td>
                   </tr>
                 )}
               </tbody>

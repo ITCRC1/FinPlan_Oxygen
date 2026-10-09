@@ -29,6 +29,7 @@ import { getBeMensual, type BeMensual } from "@/lib/api";
 import { bajarCuadros } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import { BarraContexto, useContextoBE, useVigencia, usd, pct } from "../_contexto";
+import Monto from "@/components/Monto";
 
 const TD: React.CSSProperties = { padding: "6px 8px", fontSize: 13, textAlign: "right" };
 const TH: React.CSSProperties = {
@@ -125,9 +126,9 @@ export default function MensualBE() {
                     <td style={{ ...TD, textAlign: "left", fontWeight: 600 }}>
                       {MESES[m.month - 1]}
                     </td>
-                    <td style={TD}>{usd(m.revenue)}</td>
-                    <td style={TD}>{usd(m.variable_cost)}</td>
-                    <td style={TD}>{usd(m.fixed_cost)}</td>
+                    <td style={TD}><Monto>{usd(m.revenue)}</Monto></td>
+                    <td style={TD}><Monto>{usd(m.variable_cost)}</Monto></td>
+                    <td style={TD}><Monto>{usd(m.fixed_cost)}</Monto></td>
                     <td style={TD}>{pct(m.cm_pct)}</td>
                     <td style={TD} title={m.motivo || undefined}>
                       {m.be_revenue === null

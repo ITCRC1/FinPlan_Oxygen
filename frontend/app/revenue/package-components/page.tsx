@@ -13,6 +13,7 @@ import {
   getFbPlan,
   type Scenario, type PkgItem, type FbPlanConfigDTO,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 interface ItemRow {
   inclusion: string; unit: string; unitPrice: string; enabled: boolean;
@@ -610,9 +611,9 @@ export default function PackageComponentsPage() {
                       {COMIDAS.map(c => (
                         <tr key={c}>
                           <td style={{ textAlign: "left", fontWeight: 500 }}>{t(`meal_${c}`)}</td>
-                          <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(precio(c))}</td>
+                          <td className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(precio(c))}</Monto></td>
                           <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{(captura(c) * 100).toFixed(1)}%</td>
-                          <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(precio(c) * captura(c))}</td>
+                          <td className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(precio(c) * captura(c))}</Monto></td>
                           <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(precio(c) * sc)}</td>
                         </tr>
                       ))}
@@ -620,9 +621,9 @@ export default function PackageComponentsPage() {
                     <tfoot>
                       <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
                         <td style={{ textAlign: "left" }}>{t("fbIfAllThree")}</td>
-                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(base)}</Monto></td>
                         <td />
-                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(base)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(base)}</Monto></td>
                         <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(base * sc)}</td>
                       </tr>
                       <tr style={{ fontWeight: 700 }}>
@@ -630,7 +631,7 @@ export default function PackageComponentsPage() {
                         <td colSpan={2} style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right", fontWeight: 400 }}>
                           {t("fbRealHelp")}
                         </td>
-                        <td className="mono" style={{ textAlign: "right" }}>{fmtUsd(efectivo)}</td>
+                        <td className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(efectivo)}</Monto></td>
                         <td className="mono" style={{ textAlign: "right", color: "var(--text-secondary)" }}>{fmtUsd(efectivo * sc)}</td>
                       </tr>
                       <tr style={{ fontWeight: 700 }}>

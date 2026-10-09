@@ -12,6 +12,7 @@ import { bajarCuadros, type Cuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { HOTEL_ID } from "@/lib/hotel";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 // Los meses salen de `months.short` del catálogo; esto queda de respaldo.
 const MESES_FALLBACK = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -477,7 +478,7 @@ export default function CashflowDirectoPage() {
                         </td>
                       ))}
                       <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)", color: annual < 0 ? "var(--negative)" : strong ? GOLD : "var(--text-primary)" }}>
-                        <span className="mono">{usd(annual)}</span>
+                        <span className="mono"><Monto>{usd(annual)}</Monto></span>
                       </td>
                     </tr>
                   );
@@ -634,13 +635,13 @@ function RetencionesTab({ ret, subTab, setSubTab, tramos, setTramo, deduceCcss, 
             <tbody>
               <tr>
                 <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, zIndex: 1, background: "var(--bg-base)", color: "var(--text-secondary)" }}>{t("taxableBase")}</td>
-                {ret.base_mes.map((v, k) => <td key={k} style={td}><span className="mono">{usd(v)}</span></td>)}
-                <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)" }}><span className="mono">{usd(ret.base_anual)}</span></td>
+                {ret.base_mes.map((v, k) => <td key={k} style={td}><span className="mono"><Monto>{usd(v)}</Monto></span></td>)}
+                <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)" }}><span className="mono"><Monto>{usd(ret.base_anual)}</Monto></span></td>
               </tr>
               <tr>
                 <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, zIndex: 1, background: "var(--bg-base)", color: GOLD, fontWeight: 700 }}>{t("salaryWithholding")}</td>
                 {ret.total_mes.map((v, k) => <td key={k} style={{ ...td, fontWeight: 700 }}><span className="mono" style={{ color: GOLD }}>{usd(v)}</span></td>)}
-                <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)", color: GOLD }}><span className="mono">{usd(ret.total_anual)}</span></td>
+                <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)", color: GOLD }}><span className="mono"><Monto>{usd(ret.total_anual)}</Monto></span></td>
               </tr>
               <tr>
                 <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, zIndex: 1, background: "var(--bg-base)", color: "var(--text-secondary)" }}>{t("fxOfMonth")}</td>
@@ -674,7 +675,7 @@ function RetencionesTab({ ret, subTab, setSubTab, tramos, setTramo, deduceCcss, 
                   <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, zIndex: 1, background: "var(--bg-base)", color: "var(--text-primary)", fontWeight: 600 }}>{e.empleado}</td>
                   <td style={{ ...td, textAlign: "left", color: "var(--text-secondary)" }}>{e.puesto}</td>
                   <td style={{ ...td, textAlign: "left", color: "var(--text-secondary)" }}>{e.dept_name || e.dept_code}</td>
-                  <td style={td}><span className="mono">{usd(e.base_anual)}</span></td>
+                  <td style={td}><span className="mono"><Monto>{usd(e.base_anual)}</Monto></span></td>
                   <td style={td}><span className="mono">{Math.max(...e.tramo)}</span></td>
                   <td style={{ ...td, fontWeight: 700 }}><span className="mono" style={{ color: GOLD }}>{usd(e.impuesto_anual)}</span></td>
                 </tr>
@@ -687,9 +688,9 @@ function RetencionesTab({ ret, subTab, setSubTab, tramos, setTramo, deduceCcss, 
                   <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, zIndex: 1, background: "var(--bg-base)", color: "var(--text-secondary)" }}>{e.empleado}</td>
                   <td style={{ ...td, textAlign: "left", color: "var(--text-secondary)" }}>{e.puesto}</td>
                   <td style={{ ...td, textAlign: "left", color: "var(--text-secondary)" }}>{e.dept_name || e.dept_code}</td>
-                  <td style={td}><span className="mono">{usd(e.base_anual)}</span></td>
+                  <td style={td}><span className="mono"><Monto>{usd(e.base_anual)}</Monto></span></td>
                   <td style={td}><span className="mono">—</span></td>
-                  <td style={td}><span className="mono">{usd(0)}</span></td>
+                  <td style={td}><span className="mono"><Monto>{usd(0)}</Monto></span></td>
                 </tr>
               ))}
             </tbody>
@@ -746,7 +747,7 @@ function TablaFilas({ rows, onAyuda }: {
                   </td>
                 ))}
                 <td style={{ ...td, fontWeight: 700, background: "var(--bg-surface)", color: r.full_year < 0 ? "var(--negative)" : strong ? GOLD : "var(--text-primary)" }}>
-                  <span className="mono">{usd(r.full_year)}</span>
+                  <span className="mono"><Monto>{usd(r.full_year)}</Monto></span>
                 </td>
               </tr>
             );
@@ -791,7 +792,7 @@ function RentaAnualPanel({ renta, anio, tasa, setTasa, pago, setPago, mes, setMe
           <tbody>
             <tr>
               <td style={{ ...td, textAlign: "left" }}>{t("ebt")}</td>
-              <td style={td}><span className="mono">{usd(renta.ebt)}</span></td>
+              <td style={td}><span className="mono"><Monto>{usd(renta.ebt)}</Monto></span></td>
             </tr>
             <tr>
               <td style={{ ...td, textAlign: "left" }}>
@@ -801,13 +802,13 @@ function RentaAnualPanel({ renta, anio, tasa, setTasa, pago, setPago, mes, setMe
                   onChange={e => setTasa((parseFloat(e.target.value) || 0) / 100)} />
                 <span style={{ marginLeft: 4, color: "var(--text-secondary)" }}>%</span>
               </td>
-              <td style={td}><span className="mono">{usd(renta.impuesto_bruto)}</span></td>
+              <td style={td}><span className="mono"><Monto>{usd(renta.impuesto_bruto)}</Monto></span></td>
             </tr>
             <tr>
               <td style={{ ...td, textAlign: "left", color: "var(--text-secondary)" }}>
                 {t("advCardWithholding")}
               </td>
-              <td style={td}><span className="mono">{usd(-renta.creditos_tarjeta)}</span></td>
+              <td style={td}><span className="mono"><Monto>{usd(-renta.creditos_tarjeta)}</Monto></span></td>
             </tr>
             <tr>
               <td style={{ ...td, textAlign: "left", fontWeight: 700, borderTop: "2px solid var(--border-medium)" }}>

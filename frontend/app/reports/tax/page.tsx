@@ -10,6 +10,7 @@ import {
   getScenarios, getTax, saveTaxParams,
   type Scenario, type TaxPanorama, type TaxParams,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
@@ -165,12 +166,12 @@ export default function TaxPage() {
                 <tbody>
                   {tax.monthly.map(m => (
                     <tr key={m.month}><td style={{ padding:"4px 12px", fontSize:12, color:"var(--text-secondary)" }}>{MONTHS[m.month-1]}</td>
-                      <td style={td}>{usd0(m.card_revenue)}</td><td style={td}>{usd0(m.withholding)}</td></tr>
+                      <td style={td}><Monto>{usd0(m.card_revenue)}</Monto></td><td style={td}><Monto>{usd0(m.withholding)}</Monto></td></tr>
                   ))}
                   <tr style={{ borderTop:"2px solid var(--border-medium)", fontWeight:700 }}>
                     <td style={{ padding:"5px 12px", fontSize:12 }}>{t("yearTotal")}</td>
-                    <td style={td}>{usd0(tax.monthly.reduce((s,m)=>s+m.card_revenue,0))}</td>
-                    <td style={td}>{usd0(tax.cumulative_wh)}</td></tr>
+                    <td style={td}><Monto>{usd0(tax.monthly.reduce((s,m)=>s+m.card_revenue,0))}</Monto></td>
+                    <td style={td}><Monto>{usd0(tax.cumulative_wh)}</Monto></td></tr>
                 </tbody>
               </table>
             </div>

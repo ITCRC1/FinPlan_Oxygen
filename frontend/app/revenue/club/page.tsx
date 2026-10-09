@@ -13,6 +13,8 @@ import {
   getScenarios, getClubFee, saveClubFee,
   type Scenario, type ClubFee,
 } from "@/lib/api";
+import InputMoneda from "@/components/InputMoneda";
+import Monto from "@/components/Monto";
 
 /**
  * Club Madresal — membresías y sus tres ingresos.
@@ -270,11 +272,11 @@ export default function ClubPage() {
                 </td>
                 {Array.from({ length: 12 }, (_, m) => (
                   <td key={m} style={{ padding: 2, borderBottom: "1px solid var(--border-subtle)" }}>
-                    <input className="fin-input mono" value={precio[m]}
-                      onChange={e => ponerPrecio(m, e.target.value)}
+                    <InputMoneda value={precio[m]}
+                      onChange={v => ponerPrecio(m, v)}
                       onPaste={e => manejarPegado(e, b => pegarEnFila(b, m, 12,
                         (j, v) => ponerPrecio(j, String(numeroDeExcel(v)))))}
-                      style={{ width: "100%", textAlign: "right", fontSize: 12, padding: "3px 6px" }} />
+                      style={{ width: "100%", fontSize: 12, padding: "3px 6px" }} />
                   </td>
                 ))}
                 <td style={{ ...tdNum, borderLeft: "1px solid var(--border-medium)" }} />
@@ -286,9 +288,9 @@ export default function ClubPage() {
                   </span>
                   {fee.lineas.find(l => l.linea === "CLUB")?.nombre ?? t("feeRevenue")}
                 </td>
-                {Array.from({ length: 12 }, (_, m) => <td key={m} style={tdNum}>{money(cuotas(m))}</td>)}
+                {Array.from({ length: 12 }, (_, m) => <td key={m} style={tdNum}><Monto>{money(cuotas(m))}</Monto></td>)}
                 <td style={{ ...tdNum, borderLeft: "1px solid var(--border-medium)" }}>
-                  {money(Array.from({ length: 12 }, (_, m) => cuotas(m)).reduce((a, b) => a + b, 0))}
+                  <Monto>{money(Array.from({ length: 12 }, (_, m) => cuotas(m)).reduce((a, b) => a + b, 0))}</Monto>
                 </td>
               </tr>
               {/* Las otras dos fuentes: se digitan, pero NO son un «otros»
@@ -307,13 +309,13 @@ export default function ClubPage() {
                     </td>
                     {Array.from({ length: 12 }, (_, m) => (
                       <td key={m} style={{ padding: 2, borderBottom: "1px solid var(--border-subtle)" }}>
-                        <input className="fin-input mono" value={valores[m]}
-                          onChange={e => poner(m, e.target.value)}
-                          style={{ width: "100%", textAlign: "right", fontSize: 12, padding: "3px 6px" }} />
+                        <InputMoneda value={valores[m]}
+                          onChange={v => poner(m, v)}
+                          style={{ width: "100%", fontSize: 12, padding: "3px 6px" }} />
                       </td>
                     ))}
                     <td style={{ ...tdNum, borderLeft: "1px solid var(--border-medium)" }}>
-                      {money(Array.from({ length: 12 }, (_, m) => num(valores[m])).reduce((a, b) => a + b, 0))}
+                      <Monto>{money(Array.from({ length: 12 }, (_, m) => num(valores[m])).reduce((a, b) => a + b, 0))}</Monto>
                     </td>
                   </tr>
                 );
@@ -323,10 +325,10 @@ export default function ClubPage() {
                   {t("clubRevenue")}
                 </td>
                 {Array.from({ length: 12 }, (_, m) => (
-                  <td key={m} style={{ ...tdNum, borderTop: "1px solid var(--border-medium)" }}>{money(ingreso(m))}</td>
+                  <td key={m} style={{ ...tdNum, borderTop: "1px solid var(--border-medium)" }}><Monto>{money(ingreso(m))}</Monto></td>
                 ))}
                 <td style={{ ...tdNum, fontWeight: 700, borderLeft: "1px solid var(--border-medium)", borderTop: "1px solid var(--border-medium)" }}>
-                  {money(total)}
+                  <Monto>{money(total)}</Monto>
                 </td>
               </tr>
             </tbody>

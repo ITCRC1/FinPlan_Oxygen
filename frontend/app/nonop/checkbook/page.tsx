@@ -16,6 +16,7 @@ import {
   nonopExcelUrl, importNonopExcel,
   type Scenario, type NonOpBulkRow,
 } from "@/lib/api";
+import InputMoneda from "@/components/InputMoneda";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -568,14 +569,13 @@ function LineBlock({
                 {/* ⚠️ `readOnly` y no `disabled`: un input deshabilitado no deja
                     seleccionar ni copiar el numero, y un mes cerrado se sigue
                     consultando. */}
-                <input
+                <InputMoneda
                   value={r.months[mk]}
                   readOnly={cerrado(mi + 1)}
-                  onChange={e => onSetMonth(r.key, mk, e.target.value)}
+                  onChange={v => onSetMonth(r.key, mk, v)}
                   onPaste={e => manejarPegado(e, b => pegarDesde(ri, mi, b))}
-                  className="fin-input"
-                  style={{ width: 66, textAlign: "right",
-                           ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}
+                  className="fin-input mono"
+                  style={{ width: 84, ...(cerrado(mi + 1) ? CELDA_CERRADA : {}) }}
                 />
               </td>
             ))}

@@ -10,6 +10,7 @@ import {
   getScenarios, getPayrollDepts, getPayrollByPosition,
   type Scenario, type Dept, type PayrollByPositionReport, type PayrollPositionRow,
 } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const HOTEL = HOTEL_ID;
 const GOLD = "#c8a24a";
@@ -334,14 +335,14 @@ export default function PayrollByPositionPage() {
                     {vista === "resumen" ? (
                       <>
                         {columnas.map(c => (
-                          <td key={c.key} style={tdNum}>{money(r.anual[c.key] ?? 0)}</td>
+                          <td key={c.key} style={tdNum}><Monto>{money(r.anual[c.key] ?? 0)}</Monto></td>
                         ))}
                         <td style={{ ...tdNum, fontWeight: 700, color: GOLD }}>{money(r.costo)}</td>
                       </>
                     ) : (
                       <>
                         {(r.meses[concepto] ?? []).map((v, m) => (
-                          <td key={m} style={tdNum}>{money(v)}</td>
+                          <td key={m} style={tdNum}><Monto>{money(v)}</Monto></td>
                         ))}
                         <td style={{ ...tdNum, fontWeight: 700, color: GOLD }}>
                           {money(r.anual[concepto] ?? 0)}
@@ -361,7 +362,7 @@ export default function PayrollByPositionPage() {
                     <>
                       {columnas.map(c => (
                         <td key={c.key} style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)" }}>
-                          {money(filas.reduce((a, r) => a + (r.anual[c.key] ?? 0), 0))}
+                          <Monto>{money(filas.reduce((a, r) => a + (r.anual[c.key] ?? 0), 0))}</Monto>
                         </td>
                       ))}
                       <td style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)", color: GOLD }}>
@@ -372,7 +373,7 @@ export default function PayrollByPositionPage() {
                     <>
                       {Array.from({ length: 12 }, (_, m) => (
                         <td key={m} style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)" }}>
-                          {money(filas.reduce((a, r) => a + ((r.meses[concepto] ?? [])[m] ?? 0), 0))}
+                          <Monto>{money(filas.reduce((a, r) => a + ((r.meses[concepto] ?? [])[m] ?? 0), 0))}</Monto>
                         </td>
                       ))}
                       <td style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)", color: GOLD }}>

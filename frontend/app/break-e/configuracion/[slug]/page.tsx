@@ -41,6 +41,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros } from "@/lib/exportCuadro";
 import { BarraContexto, useContextoBE, useVigencia, usd, pct } from "../../_contexto";
+import Monto from "@/components/Monto";
 
 /**
  * EL VIAJE REDONDO POR EXCEL: baja toda la clasificación, se llena, se sube.
@@ -591,7 +592,7 @@ export default function ConfiguracionDepto() {
                         </span>
                       )}
                     </td>
-                    <td style={TD}>{usd(f.amount)}</td>
+                    <td style={TD}><Monto>{usd(f.amount)}</Monto></td>
                     <td style={TD}>
                       <input type="number" min={0} max={100} step={5}
                         disabled={f.excluded_from_be}
@@ -604,8 +605,8 @@ export default function ConfiguracionDepto() {
                             ? "#c0392b" : "var(--border-subtle)"}` }} />
                     </td>
                     <td style={{ ...TD, color: "var(--text-secondary)" }}>{pct(f.pct_fixed, 0)}</td>
-                    <td style={TD}>{usd(f.amount_variable)}</td>
-                    <td style={TD}>{usd(f.amount_fixed)}</td>
+                    <td style={TD}><Monto>{usd(f.amount_variable)}</Monto></td>
+                    <td style={TD}><Monto>{usd(f.amount_fixed)}</Monto></td>
                     <td style={{ ...TD, fontSize: 11, color: "var(--text-secondary)" }}>
                       {estado[f.id] === "guardando" ? tc("saving")
                         : estado[f.id] === "guardado" ? "✓"

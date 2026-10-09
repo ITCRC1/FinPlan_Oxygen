@@ -11,6 +11,7 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { recalcularYContar } from "@/lib/recalcular";
 import { bajarCuadros, type Cuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const money = (n: number) =>
   (n < 0 ? "(" : "") + "$" + Math.abs(Math.round(n)).toLocaleString("en-US") + (n < 0 ? ")" : "");
@@ -355,8 +356,8 @@ export default function ControlPage() {
               <span>{tCtl("rowsLabel")} <b>{vres.filas}</b></span>
               <span>OK: <b style={{ color: "var(--accent-green, #1A7F4B)" }}>{vres.filas_ok}</b></span>
               <span>{tCtl("withProblem")}<b style={{ color: vres.filas_con_problema ? "var(--accent-red, #C0392B)" : undefined }}>{vres.filas_con_problema}</b></span>
-              <span>{tCtl("amountArriving")}<b className="mono">{money(vres.monto_que_llega)}</b></span>
-              {vres.monto_que_se_perderia > 0 && <span style={{ color: "var(--accent-red, #C0392B)" }}>{tCtl("wouldBeLost")}<b className="mono">{money(vres.monto_que_se_perderia)}</b></span>}
+              <span>{tCtl("amountArriving")}<b className="mono"><Monto>{money(vres.monto_que_llega)}</Monto></b></span>
+              {vres.monto_que_se_perderia > 0 && <span style={{ color: "var(--accent-red, #C0392B)" }}>{tCtl("wouldBeLost")}<b className="mono"><Monto>{money(vres.monto_que_se_perderia)}</Monto></b></span>}
             </div>
             {vres.filas_con_problema > 0 && (
               <div className="fin-scroll-x" style={{ overflowX: "auto", maxHeight: 260, overflowY: "auto" }}>
@@ -368,7 +369,7 @@ export default function ControlPage() {
                       <td style={{ textAlign: "left" }} className="mono">{d.fila}</td>
                       <td style={{ textAlign: "left", fontSize: 12 }}>{d.dept_name || d.dept_code || "—"}</td>
                       <td style={{ textAlign: "left" }} className="mono">{d.account_code}</td>
-                      <td style={{ textAlign: "right" }} className="mono">{money(d.monto)}</td>
+                      <td style={{ textAlign: "right" }} className="mono"><Monto>{money(d.monto)}</Monto></td>
                       <td style={{ textAlign: "left", fontSize: 11.5, color: st.fg }}>{st.label} — {st.help}</td>
                     </tr>);
                   })}</tbody>
@@ -440,8 +441,8 @@ export default function ControlPage() {
                     <td style={{ textAlign: "left", fontWeight: 500 }}>{l.line_name}
                       <div style={{ fontSize: 10, color: "var(--text-disabled)" }}>{l.line_code}</div></td>
                     <td style={{ textAlign: "left", fontSize: 11, color: "var(--text-secondary)" }}>{l.section}</td>
-                    <td className="mono" style={{ textAlign: "right" }}>{money(l.amount_sources)}</td>
-                    <td className="mono" style={{ textAlign: "right" }}>{money(l.amount_pl)}</td>
+                    <td className="mono" style={{ textAlign: "right" }}><Monto>{money(l.amount_sources)}</Monto></td>
+                    <td className="mono" style={{ textAlign: "right" }}><Monto>{money(l.amount_pl)}</Monto></td>
                     <td className="mono" style={{ textAlign: "right", color: l.ok ? "var(--text-disabled)" : "var(--accent-red, #C0392B)", fontWeight: l.ok ? 400 : 700 }}>{l.ok ? "—" : money(l.dif)}</td>
                     <td style={{ textAlign: "center", fontSize: 11, color: "var(--text-secondary)" }}>{l.depts.join(", ")}</td>
                   </tr>
@@ -484,7 +485,7 @@ export default function ControlPage() {
                       <td style={{ textAlign: "left", fontSize: 12 }}>
                         <span className="mono" style={{ fontWeight: 700 }}>{r.account_code}</span>
                         <span style={{ color: "var(--text-secondary)" }}> {r.account_name}</span></td>
-                      <td className="mono" style={{ textAlign: "right" }}>{money(r.amount)}</td>
+                      <td className="mono" style={{ textAlign: "right" }}><Monto>{money(r.amount)}</Monto></td>
                       <td style={{ textAlign: "left", fontSize: 12, color: r.line_code ? "var(--text-primary)" : "var(--accent-red, #C0392B)" }}>
                         {r.line_code ? r.line_name : tCtl("notInPL")}
                         {r.mode === "FALLBACK" && r.fallback_from && (

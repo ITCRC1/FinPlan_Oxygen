@@ -18,6 +18,7 @@ import { getBeDeptos, getBeResultado, type BeDepto, type BeResultado } from "@/l
 import { bajarCuadros } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import { BarraContexto, useContextoBE, useVigencia, usd, pct } from "../_contexto";
+import Monto from "@/components/Monto";
 
 const TH: React.CSSProperties = {
   textAlign: "right", padding: "7px 8px", fontSize: 11, fontWeight: 700,
@@ -116,21 +117,21 @@ export default function PorDepartamento() {
                       {meta[f.slug]?.name || f.slug}
                     </Link>
                   </td>
-                  <td style={TD}>{usd(f.revenue)}</td>
-                  <td style={TD}>{usd(f.variable_cost)}</td>
-                  <td style={TD}>{usd(f.contribution_margin)}</td>
+                  <td style={TD}><Monto>{usd(f.revenue)}</Monto></td>
+                  <td style={TD}><Monto>{usd(f.variable_cost)}</Monto></td>
+                  <td style={TD}><Monto>{usd(f.contribution_margin)}</Monto></td>
                   <td style={TD}>{pct(f.cm_pct)}</td>
-                  <td style={TD}>{usd(f.fixed_cost)}</td>
-                  <td style={TD}>{usd(f.total_cost)}</td>
+                  <td style={TD}><Monto>{usd(f.fixed_cost)}</Monto></td>
+                  <td style={TD}><Monto>{usd(f.total_cost)}</Monto></td>
                 </tr>
               ))}
               <tr style={{ fontWeight: 700, borderTop: "1px solid var(--border-medium)" }}>
                 <td style={IZQ}>{t("subtotalOperativos")}</td>
-                <td style={TD}>{usd(sum(operativos, "revenue"))}</td>
-                <td style={TD}>{usd(sum(operativos, "variable_cost"))}</td>
+                <td style={TD}><Monto>{usd(sum(operativos, "revenue"))}</Monto></td>
+                <td style={TD}><Monto>{usd(sum(operativos, "variable_cost"))}</Monto></td>
                 <td style={TD}>—</td><td style={TD}>—</td>
-                <td style={TD}>{usd(sum(operativos, "fixed_cost"))}</td>
-                <td style={TD}>{usd(sum(operativos, "total_cost"))}</td>
+                <td style={TD}><Monto>{usd(sum(operativos, "fixed_cost"))}</Monto></td>
+                <td style={TD}><Monto>{usd(sum(operativos, "total_cost"))}</Monto></td>
               </tr>
 
               <tr>
@@ -148,20 +149,20 @@ export default function PorDepartamento() {
                     </Link>
                   </td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>—</td>
-                  <td style={TD}>{usd(f.variable_cost)}</td>
+                  <td style={TD}><Monto>{usd(f.variable_cost)}</Monto></td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>—</td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>—</td>
-                  <td style={TD}>{usd(f.fixed_cost)}</td>
-                  <td style={TD}>{usd(f.total_cost)}</td>
+                  <td style={TD}><Monto>{usd(f.fixed_cost)}</Monto></td>
+                  <td style={TD}><Monto>{usd(f.total_cost)}</Monto></td>
                 </tr>
               ))}
               <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border-medium)" }}>
                 <td style={IZQ}>{tc("total")}</td>
-                <td style={TD}>{usd(sum(filas, "revenue"))}</td>
-                <td style={TD}>{usd(sum(filas, "variable_cost"))}</td>
+                <td style={TD}><Monto>{usd(sum(filas, "revenue"))}</Monto></td>
+                <td style={TD}><Monto>{usd(sum(filas, "variable_cost"))}</Monto></td>
                 <td style={TD}>—</td><td style={TD}>—</td>
-                <td style={TD}>{usd(sum(filas, "fixed_cost"))}</td>
-                <td style={TD}>{usd(sum(filas, "total_cost"))}</td>
+                <td style={TD}><Monto>{usd(sum(filas, "fixed_cost"))}</Monto></td>
+                <td style={TD}><Monto>{usd(sum(filas, "total_cost"))}</Monto></td>
               </tr>
             </tbody>
           </table>

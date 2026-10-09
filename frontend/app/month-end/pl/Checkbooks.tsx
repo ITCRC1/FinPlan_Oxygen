@@ -34,6 +34,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getDetalleDeCelda, type DetalleCelda, type Scenario } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -346,8 +347,8 @@ export default function Checkbooks({ escenarios, scenarioIds, deptos }: {
                           ...TD, fontWeight: 700,
                           borderTop: "1px solid var(--border-medium)",
                         }}>
-                          {usd(g.filas.reduce(
-                            (a, f) => a + ((f.series[v.scenario_id] ?? [])[i] ?? 0), 0))}
+                          <Monto>{usd(g.filas.reduce(
+                            (a, f) => a + ((f.series[v.scenario_id] ?? [])[i] ?? 0), 0))}</Monto>
                         </td>
                       ))}
                       <td className="mono" style={{
@@ -355,8 +356,8 @@ export default function Checkbooks({ escenarios, scenarioIds, deptos }: {
                         borderTop: "1px solid var(--border-medium)",
                         borderLeft: "2px solid var(--border-medium)",
                       }}>
-                        {usd(g.filas.reduce(
-                          (a, f) => a + total(f.series[v.scenario_id]), 0))}
+                        <Monto>{usd(g.filas.reduce(
+                          (a, f) => a + total(f.series[v.scenario_id]), 0))}</Monto>
                       </td>
                     </tr>,
                   ])}
@@ -377,7 +378,7 @@ export default function Checkbooks({ escenarios, scenarioIds, deptos }: {
                       borderTop: "2px solid var(--text-primary)",
                       borderLeft: "2px solid var(--border-medium)",
                     }}>
-                      {usd(filas.reduce((a, f) => a + total(f.series[v.scenario_id]), 0))}
+                      <Monto>{usd(filas.reduce((a, f) => a + total(f.series[v.scenario_id]), 0))}</Monto>
                     </td>
                   </tr>
                   {!filas.length && !cargando && (

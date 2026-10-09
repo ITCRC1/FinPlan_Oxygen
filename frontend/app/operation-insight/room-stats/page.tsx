@@ -10,6 +10,7 @@ import {
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 type EntryRow = { room_type_name: string; units: number; nights_available: number; no: string; pax: string; rev: string };
 const ENTRY_COLS: ("no"|"pax"|"rev")[] = ["no", "pax", "rev"];
@@ -390,8 +391,8 @@ export default function OperationRoomStatsPage() {
                     <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{r.units}</td>
                     <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{int(r.nights_occupied)}</td>
                     <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{(r.occupancy_pct*100).toFixed(1)}%</td>
-                    <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{money(r.adr)}</td>
-                    <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{money(r.revenue)}</td>
+                    <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}><Monto>{money(r.adr)}</Monto></td>
+                    <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}><Monto>{money(r.revenue)}</Monto></td>
                     <td className="mono" style={{ textAlign: "right", padding: "10px 12px", fontSize: 12.5, verticalAlign: "middle" }}>{int(r.pax)}</td>
                   </tr>
                 ))}
@@ -400,8 +401,8 @@ export default function OperationRoomStatsPage() {
                   <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{tot.units}</td>
                   <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{int(tot.no)}</td>
                   <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{(occTotal*100).toFixed(1)}%</td>
-                  <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{money(adrTotal)}</td>
-                  <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{money(tot.rev)}</td>
+                  <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}><Monto>{money(adrTotal)}</Monto></td>
+                  <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}><Monto>{money(tot.rev)}</Monto></td>
                   <td className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: 700 }}>{int(tot.pax)}</td>
                 </tr>
               </tbody>

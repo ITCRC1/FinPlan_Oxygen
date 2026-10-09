@@ -15,6 +15,8 @@ import {
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
 import IrA from "@/components/IrA";
+import InputMoneda from "@/components/InputMoneda";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS: MonthKey[] = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -216,10 +218,10 @@ export default function SpaBudgetPage() {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 14, flexWrap: "wrap", margin: "14px 0" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
           {t("avgPrice")}
-          <input className="fin-input mono" type="number" value={avgPrice}
+          <InputMoneda value={avgPrice}
+            onChange={v => { setAvgPrice(v); setDirty(true); }}
             disabled={sel?.is_locked}
-            onChange={e => { setAvgPrice(e.target.value); setDirty(true); }}
-            style={{ width: 160, textAlign: "right", padding: "4px 6px" }} />
+            style={{ width: 110, padding: "4px 6px" }} />
         </label>
         <div style={{ flex: 1 }} />
         <button onClick={handleSave} disabled={saving || !dirty || sel?.is_locked} style={btnStyle(!saving && dirty && !sel?.is_locked)}>
@@ -275,7 +277,7 @@ export default function SpaBudgetPage() {
               </tr>
               <tr>
                 <td style={{ textAlign: "left", fontWeight: 500 }}>{t("spaRevenue")}</td>
-                {revenue.map((v, i) => <td key={i} className="mono" style={td}>{usd(v)}</td>)}
+                {revenue.map((v, i) => <td key={i} className="mono" style={td}><Monto>{usd(v)}</Monto></td>)}
                 <td className="mono" style={{ ...yr, color: "var(--brand)" }}>{usd(tRev)}</td>
               </tr>
             </tbody>

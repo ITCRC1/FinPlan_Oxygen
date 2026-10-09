@@ -26,6 +26,7 @@ import { useTranslations } from "next-intl";
 import { getBeResultado, type BeResultado } from "@/lib/api";
 import IrA from "@/components/IrA";
 import { BarraContexto, useContextoBE, useVigencia, usd, pct } from "../_contexto";
+import Monto from "@/components/Monto";
 
 const CARD: React.CSSProperties = {
   padding: 16, borderRadius: 10, background: "var(--bg-surface)",
@@ -110,21 +111,21 @@ export default function ResumenBE() {
               <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 {t("contributionStatement")}
               </h2>
-              <div style={FILA}><span>{t("lineRevenue")}</span><b>{usd(r!.revenue)}</b></div>
-              <div style={FILA}><span>{t("lineVariableCost")}</span><span>{usd(r!.variable_cost)}</span></div>
+              <div style={FILA}><span>{t("lineRevenue")}</span><b><Monto>{usd(r!.revenue)}</Monto></b></div>
+              <div style={FILA}><span>{t("lineVariableCost")}</span><span><Monto>{usd(r!.variable_cost)}</Monto></span></div>
               <div style={{ ...FILA, borderTop: "1px solid var(--border-subtle)" }}>
                 <span><b>{t("lineContributionMargin")}</b></span>
-                <b>{usd(r!.contribution_margin)} · {pct(r!.cm_pct)}</b>
+                <b><Monto>{usd(r!.contribution_margin)}</Monto> · {pct(r!.cm_pct)}</b>
               </div>
-              <div style={FILA}><span>{t("lineFixedCost")}</span><span>{usd(r!.fixed_cost)}</span></div>
+              <div style={FILA}><span>{t("lineFixedCost")}</span><span><Monto>{usd(r!.fixed_cost)}</Monto></span></div>
               <div style={{ ...FILA, borderTop: "1px solid var(--border-subtle)" }}>
-                <span><b>{t("lineEbt")}</b></span><b>{usd(r!.ebt)}</b>
+                <span><b>{t("lineEbt")}</b></span><b><Monto>{usd(r!.ebt)}</Monto></b>
               </div>
               <div style={FILA}>
-                <span>{t("lineIncomeTax")}</span><span>{usd(r!.excluded_cost)}</span>
+                <span>{t("lineIncomeTax")}</span><span><Monto>{usd(r!.excluded_cost)}</Monto></span>
               </div>
               <div style={{ ...FILA, borderTop: "2px solid var(--border-medium)" }}>
-                <span><b>{t("lineNet")}</b></span><b>{usd(r!.net)}</b>
+                <span><b>{t("lineNet")}</b></span><b><Monto>{usd(r!.net)}</Monto></b>
               </div>
               <p style={NOTA}>
                 {t.rich("taxOutOfFixedNote", RICH)}
@@ -142,14 +143,14 @@ export default function ResumenBE() {
               ) : (
                 <>
                   <div style={FILA}>
-                    <span>{t("beRevenueAnnual")}</span><b>{usd(eq!.be_revenue)}</b>
+                    <span>{t("beRevenueAnnual")}</span><b><Monto>{usd(eq!.be_revenue)}</Monto></b>
                   </div>
                   <div style={FILA}>
                     <span>{t("bePctOfBudget")}</span><span>{pct(eq!.be_pct_of_revenue)}</span>
                   </div>
                   <div style={FILA}>
                     <span>{t("marginOfSafety")}</span>
-                    <span>{usd(eq!.margin_of_safety)} · {pct(eq!.margin_of_safety_pct)}</span>
+                    <span><Monto>{usd(eq!.margin_of_safety)}</Monto> · {pct(eq!.margin_of_safety_pct)}</span>
                   </div>
                   <div style={FILA}>
                     <span>{t("operatingLeverage")}</span>
@@ -165,7 +166,7 @@ export default function ResumenBE() {
                   )}
                   <div style={{ ...FILA, opacity: .75 }}>
                     <span>{t("beMonthlyLinear")}</span>
-                    <span>{usd(eq!.be_revenue_monthly_linear)}</span>
+                    <span><Monto>{usd(eq!.be_revenue_monthly_linear)}</Monto></span>
                   </div>
                   <p style={{ ...NOTA, color: "#d6a626" }}>
                     {t.rich("beMonthlyLinearWarn", RICH)}
@@ -193,7 +194,7 @@ export default function ResumenBE() {
                       { maximumFractionDigits: 0 }) ?? "—"}</span>
                   </div>
                   <div style={FILA}>
-                    <span>{t("beTrevpar")}</span><span>{usd(hab!.be_trevpar)}</span>
+                    <span>{t("beTrevpar")}</span><span><Monto>{usd(hab!.be_trevpar)}</Monto></span>
                   </div>
                   <div style={FILA}>
                     <span>{t("roomsMix")}</span><span>{pct(hab!.rooms_mix)}</span>

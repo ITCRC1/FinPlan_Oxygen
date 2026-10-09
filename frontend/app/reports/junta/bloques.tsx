@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { PLColumn, PayrollDeptReport, PLMonthly, CashFlowBudget, PLByDept } from "@/lib/api";
 import type { Version } from "./versiones";
+import Monto from "@/components/Monto";
 
 /**
  * Bloques de contenido de la Presentación a la Junta.
@@ -570,7 +571,7 @@ export function PlanillaHeadcount({ vs, reportes }: { vs: Version[]; reportes: R
           {orden.map(dp => (
             <tr key={dp.dept_code} style={{ borderTop: "1px solid var(--border-subtle)" }}>
               <td style={tdL}>{dp.dept_name || dp.dept_code}</td>
-              <td className="mono" style={{ ...td, fontWeight: 700 }}>{dinero(dp.total_annual)}</td>
+              <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{dinero(dp.total_annual)}</Monto></td>
               {vs.slice(1).map(v => {
                 // Se cruza por CÓDIGO de departamento: el registro es distinto en
                 // cada escenario, así que por id no cruzaría nada.
@@ -578,7 +579,7 @@ export function PlanillaHeadcount({ vs, reportes }: { vs: Version[]; reportes: R
                 if (!otro) return <><td key={v.id} style={sub}>—</td><td key={`${v.id}-d`} style={td}>—</td></>;
                 return (
                   <>
-                    <td key={v.id} className="mono" style={sub}>{dinero(otro.total_annual)}</td>
+                    <td key={v.id} className="mono" style={sub}><Monto>{dinero(otro.total_annual)}</Monto></td>
                     <CeldaVar key={`${v.id}-d`} a={dp.total_annual} b={otro.total_annual} fmt={dinero} />
                   </>
                 );
@@ -685,7 +686,7 @@ export function Caja({ cajas, vs }: { cajas: Record<string, CashFlowBudget | nul
                   if (!c) return <><td key={v.id} style={sub}>—</td><td key={`${v.id}-d`} style={td}>—</td></>;
                   return (
                     <>
-                      <td key={v.id} className="mono" style={sub}>{dinero(valor(c, r.k))}</td>
+                      <td key={v.id} className="mono" style={sub}><Monto>{dinero(valor(c, r.k))}</Monto></td>
                       <CeldaVar key={`${v.id}-d`} a={a} b={valor(c, r.k)} fmt={dinero} />
                     </>
                   );
@@ -740,7 +741,7 @@ export function Caja({ cajas, vs }: { cajas: Record<string, CashFlowBudget | nul
                 {MESES.map((_, j) => {
                   const d = mes(cf, concepto, j) - mes(cajas[v.id], concepto, j);
                   const color = Math.abs(d) < 0.5 ? "var(--text-disabled)" : d > 0 ? "var(--positive, #1A7F4B)" : "var(--negative)";
-                  return <td key={j} className="mono" style={{ ...td, fontSize: 11, color }}>{dinero(d)}</td>;
+                  return <td key={j} className="mono" style={{ ...td, fontSize: 11, color }}><Monto>{dinero(d)}</Monto></td>;
                 })}
                 <td className="mono" style={{ ...td, fontSize: 11, fontWeight: 800, color: GOLD }}>
                   {dinero(valor(cf, concepto) - valor(cajas[v.id], concepto))}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import { sharedScenarioOr } from "@/lib/planningScenario";
+import Monto from "@/components/Monto";
 
 const BTN: React.CSSProperties = {
   padding: "7px 14px", borderRadius: 6, cursor: "pointer",
@@ -862,7 +863,7 @@ export default function MixerCanales({ scenarioId }: { scenarioId?: string } = {
             <div style={{ color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase" }}>
               {t("mixer.roomsRevenue")}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{usd(rooms)}</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}><Monto>{usd(rooms)}</Monto></div>
           </div>
           <div>
             <div style={{ color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase" }}>
@@ -922,13 +923,13 @@ export default function MixerCanales({ scenarioId }: { scenarioId?: string } = {
                 <div style={{ color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase" }}>
                   {t("mixer.netInPl")}
                 </div>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{usd(netoBase)}</div>
+                <div style={{ fontSize: 17, fontWeight: 700 }}><Monto>{usd(netoBase)}</Monto></div>
               </div>
               <div>
                 <div style={{ color: "var(--text-secondary)", fontSize: 11, textTransform: "uppercase" }}>
                   {t("mixer.rackSale", { nf: nfHoy.toFixed(4) })}
                 </div>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{usd(rack)}</div>
+                <div style={{ fontSize: 17, fontWeight: 700 }}><Monto>{usd(rack)}</Monto></div>
               </div>
             </div>
 
@@ -951,20 +952,20 @@ export default function MixerCanales({ scenarioId }: { scenarioId?: string } = {
                           {pct(x.mix, 0)} · {pct(x.com, 0)}
                         </span>
                       </td>
-                      <td style={NUM}>{usd(x.bruto)}</td>
+                      <td style={NUM}><Monto>{usd(x.bruto)}</Monto></td>
                       <td style={{ ...NUM, color: x.comision ? "#C0392B" : "inherit" }}>
                         {x.comision ? `−${usd(x.comision)}` : usd(0)}
                       </td>
-                      <td style={NUM}>{usd(x.neto)}</td>
+                      <td style={NUM}><Monto>{usd(x.neto)}</Monto></td>
                     </tr>
                   ))}
                   <tr>
                     <td style={{ ...TD, fontWeight: 700 }}>{tc("total")}</td>
-                    <td style={{ ...NUM, fontWeight: 700 }}>{usd(totBruto)}</td>
+                    <td style={{ ...NUM, fontWeight: 700 }}><Monto>{usd(totBruto)}</Monto></td>
                     <td style={{ ...NUM, fontWeight: 700, color: "#C0392B" }}>
                       −{usd(totComision)}
                     </td>
-                    <td style={{ ...NUM, fontWeight: 700 }}>{usd(totNeto)}</td>
+                    <td style={{ ...NUM, fontWeight: 700 }}><Monto>{usd(totNeto)}</Monto></td>
                   </tr>
                 </tbody>
               </table>

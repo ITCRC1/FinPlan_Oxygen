@@ -12,6 +12,7 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
 import NivelDeDetalle from "@/components/NivelDeDetalle";
 import { useImprimirEnUnaHoja } from "@/lib/imprimirEnUnaHoja";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
@@ -267,19 +268,19 @@ export default function PLByDeptReportPage() {
               {opDepts.map(d => (
                 <tr key={d.group} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                   <td style={{ padding: "5px 12px", fontSize: 13, color: "var(--text-primary)" }}>{d.name}</td>
-                  <td className="mono" style={td}>{usd(d.revenue)}</td>
-                  <td className="mono" style={td}>{usd(d.payroll)}{pctCell(d.payroll, d.revenue)}</td>
-                  <td className="mono" style={td}>{usd(d.operating)}{pctCell(d.operating, d.revenue)}</td>
-                  <td className="mono" style={td}>{usd(d.total_expenses)}</td>
+                  <td className="mono" style={td}><Monto>{usd(d.revenue)}</Monto></td>
+                  <td className="mono" style={td}><Monto>{usd(d.payroll)}</Monto>{pctCell(d.payroll, d.revenue)}</td>
+                  <td className="mono" style={td}><Monto>{usd(d.operating)}</Monto>{pctCell(d.operating, d.revenue)}</td>
+                  <td className="mono" style={td}><Monto>{usd(d.total_expenses)}</Monto></td>
                   <td className="mono" style={{ ...td, fontWeight: 600, color: d.gop < 0 ? "var(--negative)" : "var(--positive)" }}>{usd(d.gop)}{pctCell(d.gop, d.revenue)}</td>
                 </tr>
               ))}
               <tr style={{ borderTop: "1px solid var(--border-medium)", background: "rgba(38,166,154,0.08)" }}>
                 <td style={{ padding: "6px 12px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Total Operating Profit</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(opPay)}{pctCell(opPay, opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(opOpx)}{pctCell(opOpx, opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(opExp)}{pctCell(opExp, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(opRev)}</Monto></td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(opPay)}</Monto>{pctCell(opPay, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(opOpx)}</Monto>{pctCell(opOpx, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(opExp)}</Monto>{pctCell(opExp, opRev)}</td>
                 <td className="mono" style={{ ...td, fontWeight: 700, color: data.total_operating_profit < 0 ? "var(--negative)" : "var(--positive)" }}>{usd(data.total_operating_profit)}{pctCell(data.total_operating_profit, opRev)}</td>
               </tr>
 
@@ -292,18 +293,18 @@ export default function PLByDeptReportPage() {
                   <tr key={d.group} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
                     <td style={{ padding: "5px 12px", fontSize: 13, color: "var(--text-primary)" }}>{d.name}</td>
                     <td className="mono" style={{ ...td, color: "var(--text-disabled)" }}>—</td>
-                    <td className="mono" style={td}>{usd(d.payroll)}</td>
-                    <td className="mono" style={td}>{usd(d.operating)}</td>
-                    <td className="mono" style={{ ...td, fontWeight: 600 }}>{usd(d.total_expenses)}</td>
+                    <td className="mono" style={td}><Monto>{usd(d.payroll)}</Monto></td>
+                    <td className="mono" style={td}><Monto>{usd(d.operating)}</Monto></td>
+                    <td className="mono" style={{ ...td, fontWeight: 600 }}><Monto>{usd(d.total_expenses)}</Monto></td>
                     <td className="mono" style={{ ...td, color: "var(--text-disabled)" }}>—</td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: "1px solid var(--border-medium)", background: "rgba(239,83,80,0.08)" }}>
                   <td style={{ padding: "6px 12px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Total Overhead</td>
                   <td className="mono" style={{ ...td, color: "var(--text-disabled)" }}>—</td>
-                  <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(ohPay)}</td>
-                  <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(ohOpx)}</td>
-                  <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(data.total_overhead)}</td>
+                  <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(ohPay)}</Monto></td>
+                  <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(ohOpx)}</Monto></td>
+                  <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(data.total_overhead)}</Monto></td>
                   <td className="mono" style={{ ...td, color: "var(--text-disabled)" }}>—</td>
                 </tr>
               </>}
@@ -311,10 +312,10 @@ export default function PLByDeptReportPage() {
               {/* GOP = Operating Profit − Overhead */}
               <tr style={{ borderTop: "2px solid var(--border-medium)", background: "rgba(255,255,255,0.04)" }}>
                 <td style={{ padding: "7px 12px", fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>GROSS OPERATING PROFIT (GOP)</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(totPay)}{pctCell(totPay, opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(totOpx)}{pctCell(totOpx, opRev)}</td>
-                <td className="mono" style={{ ...td, fontWeight: 700 }}>{usd(totExp)}{pctCell(totExp, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(opRev)}</Monto></td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(totPay)}</Monto>{pctCell(totPay, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(totOpx)}</Monto>{pctCell(totOpx, opRev)}</td>
+                <td className="mono" style={{ ...td, fontWeight: 700 }}><Monto>{usd(totExp)}</Monto>{pctCell(totExp, opRev)}</td>
                 <td className="mono" style={{ ...td, fontWeight: 700, color: data.total_gop < 0 ? "var(--negative)" : "var(--positive)" }}>{usd(data.total_gop)}{pctCell(data.total_gop, opRev)}</td>
               </tr>
             </tbody>

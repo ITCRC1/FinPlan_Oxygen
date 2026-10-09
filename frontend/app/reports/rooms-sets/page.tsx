@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const HOTEL = HOTEL_ID;
 const GOLD = "#c8a24a";
@@ -206,7 +207,7 @@ export default function RoomsSetsReportPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: 10.5, color: "var(--text-secondary)" }}>{t("mIngreso")}</div>
-                      <div className="mono" style={{ fontSize: 17, fontWeight: 700 }}>{money(r.revenue_anual)}</div>
+                      <div className="mono" style={{ fontSize: 17, fontWeight: 700 }}><Monto>{money(r.revenue_anual)}</Monto></div>
                     </div>
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 8, lineHeight: 1.6 }}>
@@ -248,9 +249,9 @@ export default function RoomsSetsReportPage() {
                 {data.rows.map(r => (
                   <tr key={r.key}>
                     <td style={{ ...td, fontWeight: r.es_residuo ? 500 : 700 }}>{r.name}</td>
-                    {serie(r).map((v, m) => <td key={m} style={tdNum}>{money(v)}</td>)}
+                    {serie(r).map((v, m) => <td key={m} style={tdNum}><Monto>{money(v)}</Monto></td>)}
                     <td style={{ ...tdNum, fontWeight: 700 }}>
-                      {money(serie(r).reduce((a, b) => a + b, 0))}
+                      <Monto>{money(serie(r).reduce((a, b) => a + b, 0))}</Monto>
                     </td>
                   </tr>
                 ))}
@@ -263,7 +264,7 @@ export default function RoomsSetsReportPage() {
                   </td>
                   {Array.from({ length: 12 }, (_, m) => (
                     <td key={m} style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)" }}>
-                      {money(data.rows.reduce((a, r) => a + serie(r)[m], 0))}
+                      <Monto>{money(data.rows.reduce((a, r) => a + serie(r)[m], 0))}</Monto>
                     </td>
                   ))}
                   <td style={{ ...tdNum, fontWeight: 800, borderTop: "2px solid var(--border-medium)", color: GOLD }}>

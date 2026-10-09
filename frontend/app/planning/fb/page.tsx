@@ -29,6 +29,7 @@ import {
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const COMIDAS = ["desayuno", "almuerzo", "cena"] as const;
@@ -362,15 +363,15 @@ export default function FbPlanPage() {
                       style={{ ...inp, width: 76 }} />
                   </td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>{ent(f.pax + n(paxExt[i]))}</td>
-                  {COMIDAS.map(c => <td key={c} style={TD}>{usd(f[c])}</td>)}
-                  <td style={TD}>{usd(f.bruto)}</td>
+                  {COMIDAS.map(c => <td key={c} style={TD}><Monto>{usd(f[c])}</Monto></td>)}
+                  <td style={TD}><Monto>{usd(f.bruto)}</Monto></td>
                   <td style={{ ...TD, color: f.desc ? "var(--negative, #C0392B)" : "var(--text-secondary)" }}>
                     {f.desc ? `−${usd(f.desc)}` : usd(0)}
                   </td>
-                  <td style={TD}>{usd(f.foodExt)}</td>
-                  <td style={{ ...TD, fontWeight: 600 }}>{usd(f.food)}</td>
-                  <td style={TD}>{usd(f.bev)}</td>
-                  <td style={{ ...TD, fontWeight: 700 }}>{usd(f.total)}</td>
+                  <td style={TD}><Monto>{usd(f.foodExt)}</Monto></td>
+                  <td style={{ ...TD, fontWeight: 600 }}><Monto>{usd(f.food)}</Monto></td>
+                  <td style={TD}><Monto>{usd(f.bev)}</Monto></td>
+                  <td style={{ ...TD, fontWeight: 700 }}><Monto>{usd(f.total)}</Monto></td>
                   <td style={{ ...TD, color: "var(--text-secondary)" }}>{usd(f.sc)}</td>
                 </tr>
               ))}
@@ -381,16 +382,16 @@ export default function FbPlanPage() {
                 <td style={TD}>—</td>
                 <td style={TD}>{ent(tot.pax + paxExt.reduce((a, v) => a + n(v), 0))}</td>
                 {COMIDAS.map(c => (
-                  <td key={c} style={TD}>{usd(filas.reduce((a, f) => a + f[c], 0))}</td>
+                  <td key={c} style={TD}><Monto>{usd(filas.reduce((a, f) => a + f[c], 0))}</Monto></td>
                 ))}
-                <td style={TD}>{usd(tot.bruto)}</td>
+                <td style={TD}><Monto>{usd(tot.bruto)}</Monto></td>
                 <td style={{ ...TD, color: tot.desc ? "var(--negative, #C0392B)" : undefined }}>
                   {tot.desc ? `−${usd(tot.desc)}` : usd(0)}
                 </td>
-                <td style={TD}>{usd(tot.foodExt)}</td>
-                <td style={TD}>{usd(tot.food)}</td>
-                <td style={TD}>{usd(tot.bev)}</td>
-                <td style={TD}>{usd(tot.total)}</td>
+                <td style={TD}><Monto>{usd(tot.foodExt)}</Monto></td>
+                <td style={TD}><Monto>{usd(tot.food)}</Monto></td>
+                <td style={TD}><Monto>{usd(tot.bev)}</Monto></td>
+                <td style={TD}><Monto>{usd(tot.total)}</Monto></td>
                 <td style={{ ...TD, color: "var(--text-secondary)" }}>{usd(tot.sc)}</td>
               </tr>
             </tbody>

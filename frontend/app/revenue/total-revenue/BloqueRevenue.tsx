@@ -16,6 +16,7 @@
  */
 import { fmtUsd, fmtInt } from "@/lib/fmt";
 import { rtLabel } from "@/lib/api";
+import Monto from "@/components/Monto";
 
 export interface FilaTipo {
   id: string; code: string; name: string;
@@ -92,7 +93,7 @@ export default function BloqueRevenue({
                     </td>
                   ))}
                   <td className="mono" style={{ textAlign: "right", fontWeight: 600,
-                      borderLeft: "1px solid var(--border-medium)" }}>{fmtUsd(an)}</td>
+                      borderLeft: "1px solid var(--border-medium)" }}><Monto>{fmtUsd(an)}</Monto></td>
                 </tr>
               );
             })}
@@ -101,7 +102,7 @@ export default function BloqueRevenue({
             <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border-medium)" }}>
               <td style={{ textAlign: "left" }}>{rotulos.total}</td>
               {totales.map((v, mi) => (
-                <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmtUsd(v)}</td>
+                <td key={mi} className="mono" style={{ textAlign: "right" }}><Monto>{fmtUsd(v)}</Monto></td>
               ))}
               <td className="mono" style={{ textAlign: "right", color: acento,
                   borderLeft: "1px solid var(--border-medium)" }}>{fmtUsd(anual)}</td>

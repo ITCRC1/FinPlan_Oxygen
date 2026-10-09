@@ -10,11 +10,19 @@ function toNum(v: number | string | null | undefined): number {
   return parseFloat(String(v).replace(/[, $%]/g, ""));
 }
 
-/** Monto en USD: "$1,234.56". 0/vacío → "—". */
+/** Monto en USD: "$1,234.56", y el negativo "-$1,234.56". 0/vacío → "—".
+ *
+ * ⚠️ El signo va ANTES del símbolo. Hasta el 2026-10-08 esto devolvía
+ * `$-1,234.56`, porque pegaba el "$" delante del número ya formateado. Se ve en
+ * cualquier línea que pueda ir en rojo —los no operativos, las varianzas, el
+ * resultado de un mes malo— y es de esas cosas que un contador nota al
+ * instante y el resto no. */
 export function fmtUsd(v: number | string | null | undefined): string {
   const n = toNum(v);
   if (!n || isNaN(n)) return "—";
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const abs = Math.abs(n).toLocaleString("en-US",
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? "-$" : "$") + abs;
 }
 
 /** Porcentaje a partir de una FRACCIÓN (0.398 → "39.8%"). 0/vacío → "—". */

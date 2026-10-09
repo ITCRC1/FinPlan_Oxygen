@@ -49,6 +49,7 @@ import VistasVisibles from "./VistasVisibles";
 import ResumenDoceMeses, { armar as armarResumen, filasResumen }
   from "./ResumenDoceMeses";
 import { getTabsApagados } from "@/lib/tabsVisibles";
+import Monto from "@/components/Monto";
 
 /** Respaldo si el catálogo de idioma no trae la lista larga de meses. */
 const MESES_FALLBACK = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -3359,7 +3360,7 @@ export default function MonthEndPLPage() {
           {qInfo && (
             <p style={{ fontSize: 12.5, marginBottom: 10 }}>
               <strong>{qInfo.cantidad.toLocaleString("en-US")}</strong> {t("filas")} ·
-              {" "}{t("totalLabel")} <strong className="mono">{usd(qInfo.total)}</strong>
+              {" "}{t("totalLabel")} <strong className="mono"><Monto>{usd(qInfo.total)}</Monto></strong>
               {qInfo.truncado && (
                 <span style={{ color: "var(--negative)" }}>
                   {" "}{t("truncado")}
@@ -3651,12 +3652,12 @@ export default function MonthEndPLPage() {
                   <tr style={{ background: "var(--bg-elevated)" }}>
                     <td style={{ ...TDL, fontWeight: 700 }}>Total Operating and Property Expenses</td>
                     {usadas.slice(0, trasVariacion).map(u => (
-                      <td key={u.i} style={{ ...TD, fontWeight: 700 }} className="mono">{usd(tot(u.i))}</td>
+                      <td key={u.i} style={{ ...TD, fontWeight: 700 }} className="mono"><Monto>{usd(tot(u.i))}</Monto></td>
                     ))}
                     <td style={{ ...TD, color, fontWeight: 700 }} className="mono">{sinDatoVar ? "—" : usd(d)}</td>
                     <td style={{ ...TD, color, fontWeight: 700 }} className="mono">{sinDatoVar || !p ? "—" : pct(p)}</td>
                     {usadas.slice(trasVariacion).map(u => (
-                      <td key={u.i} style={{ ...TD, fontWeight: 700 }} className="mono">{usd(tot(u.i))}</td>
+                      <td key={u.i} style={{ ...TD, fontWeight: 700 }} className="mono"><Monto>{usd(tot(u.i))}</Monto></td>
                     ))}
                   </tr>
                 );

@@ -11,6 +11,7 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { HOTEL_ID, hotelShort } from "@/lib/hotel";
 import { useHotel } from "@/lib/useHotel";
 import IrA from "@/components/IrA";
+import Monto from "@/components/Monto";
 
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
 function scnLabel(s: Scenario) {
@@ -136,12 +137,12 @@ export default function ExpensesReportPage() {
                         <td style={{ padding:"6px 12px", fontSize:12, fontWeight:600, color:"var(--text-primary)" }}>
                           {isOpen ? "▾ " : "▸ "}{deptName(d.dept_code)} <span style={{ color:"var(--text-disabled)", fontWeight:400 }}>({d.dept_code})</span>
                         </td>
-                        <td style={{ ...td, fontWeight:700 }}>{usd0(d.annual)}</td>
+                        <td style={{ ...td, fontWeight:700 }}><Monto>{usd0(d.annual)}</Monto></td>
                       </tr>
                       {isOpen && d.accounts.map(a => (
                         <tr key={d.dept_code+a.account_code}>
                           <td style={{ padding:"4px 12px 4px 30px", fontSize:12, color:"var(--text-secondary)" }}>{a.account_code} {a.account_name}</td>
-                          <td style={td}>{usd0(a.annual)}</td>
+                          <td style={td}><Monto>{usd0(a.annual)}</Monto></td>
                         </tr>
                       ))}
                     </>
@@ -149,7 +150,7 @@ export default function ExpensesReportPage() {
                 })}
                 <tr style={{ borderTop:"2px solid var(--border-medium)", fontWeight:700 }}>
                   <td style={{ padding:"6px 12px", fontSize:12 }}>TOTAL</td>
-                  <td style={td}>{usd0(grand)}</td>
+                  <td style={td}><Monto>{usd0(grand)}</Monto></td>
                 </tr>
               </tbody>
             </table>

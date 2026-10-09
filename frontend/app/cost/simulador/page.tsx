@@ -15,6 +15,7 @@ import {
   type SimulacionGrupo, type SalidaVentas,
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import Monto from "@/components/Monto";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -421,7 +422,7 @@ export default function SimuladorGruposPage() {
           <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 800 }}>
             {sim.desplazamiento.aplica ? (
               <>
-                Desplaza <b>{usd(sim.desplazamiento.noches, 0)}</b> habitación-noches,
+                Desplaza <b><Monto>{usd(sim.desplazamiento.noches, 0)}</Monto></b> habitación-noches,
                 con un ADR esperado de <b>${usd(sim.desplazamiento.adr_esperado)}</b> —
                 contribución desplazada <b>${usd(sim.desplazamiento.contribucion)}</b>,
                 ya sumada a los pisos de arriba.
@@ -429,7 +430,7 @@ export default function SimuladorGruposPage() {
             ) : (
               <>No aplica: {sim.desplazamiento.motivo}. Ocupación del mes{" "}
                 <b>{(parseFloat(sim.desplazamiento.ocupacion_pct) * 100).toFixed(1)}%</b>,
-                con <b>{usd(sim.desplazamiento.habitaciones_libres, 0)}</b> habitación-noches
+                con <b><Monto>{usd(sim.desplazamiento.habitaciones_libres, 0)}</Monto></b> habitación-noches
                 libres.</>
             )}
           </p>

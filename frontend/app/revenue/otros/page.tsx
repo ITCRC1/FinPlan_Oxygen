@@ -35,6 +35,8 @@ import {
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
 import IrA from "@/components/IrA";
+import InputMoneda from "@/components/InputMoneda";
+import Monto from "@/components/Monto";
 
 const MONTHS_FALLBACK = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
@@ -267,21 +269,21 @@ export default function OtrosIngresosPage() {
                           {usd(n((vals[l.line] ?? [])[i]))}
                         </span>
                       ) : (
-                        <input className="fin-input mono" type="number"
+                        <InputMoneda
                           value={(vals[l.line] ?? [])[i] ?? "0"} disabled={bloqueado}
-                          onChange={e => set(l.line, i, e.target.value)}
+                          onChange={v => set(l.line, i, v)}
                           onPaste={e => manejarPegado(e, b => pegar(lineas.indexOf(l), i, b))}
                           style={inp} />
                       )}
                     </td>
                   ))}
-                  <td style={{ ...TD, fontWeight: 700 }}>{usd(totalLinea(l.line))}</td>
+                  <td style={{ ...TD, fontWeight: 700 }}><Monto>{usd(totalLinea(l.line))}</Monto></td>
                 </tr>
               ))}
               <tr style={{ borderTop: "2px solid var(--border-medium)", fontWeight: 700 }}>
                 <td style={{ ...TD, textAlign: "left" }}>{tc("total")}</td>
-                {MONTHS.map((_m, i) => <td key={i} style={TD}>{usd(totalMes(i))}</td>)}
-                <td style={TD}>{usd(granTotal)}</td>
+                {MONTHS.map((_m, i) => <td key={i} style={TD}><Monto>{usd(totalMes(i))}</Monto></td>)}
+                <td style={TD}><Monto>{usd(granTotal)}</Monto></td>
               </tr>
             </tbody>
           </table>

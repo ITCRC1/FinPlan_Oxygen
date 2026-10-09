@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { bajarCuadros, type FormatoCol } from "@/lib/exportCuadro";
 import { HOTEL_ID } from "@/lib/hotel";
+import Monto from "@/components/Monto";
 
 const NOMBRE: Record<string, string> = {
   ROOMS: "Habitaciones",
@@ -304,12 +305,12 @@ export default function DescuentosPage() {
                     <td style={{ textAlign: "left", fontWeight: 600 }}>
                       {NOMBRE[f.concepto] || f.concepto}
                     </td>
-                    <td style={{ textAlign: "right" }} className="mono">{usd(f.revenue)}</td>
-                    <td style={{ textAlign: "right" }} className="mono">{usd(f.costo_departamento)}</td>
+                    <td style={{ textAlign: "right" }} className="mono"><Monto>{usd(f.revenue)}</Monto></td>
+                    <td style={{ textAlign: "right" }} className="mono"><Monto>{usd(f.costo_departamento)}</Monto></td>
                     <td style={{ textAlign: "right" }} className="mono">{pct(f.costo_departamento_pct)}</td>
-                    <td style={{ textAlign: "right" }} className="mono">{usd(f.overhead)}</td>
+                    <td style={{ textAlign: "right" }} className="mono"><Monto>{usd(f.overhead)}</Monto></td>
                     <td style={{ textAlign: "right" }} className="mono">{pct(f.overhead_pct)}</td>
-                    <td style={{ textAlign: "right" }} className="mono">{usd(f.fee)}</td>
+                    <td style={{ textAlign: "right" }} className="mono"><Monto>{usd(f.fee)}</Monto></td>
                     <td style={{ textAlign: "right" }} className="mono">{pct(f.costo_fully_loaded_pct)}</td>
                     <td style={{ textAlign: "right", color: rojo(f.utilidad) }}
                         className="mono">{usd(f.utilidad)}</td>

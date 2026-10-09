@@ -32,6 +32,7 @@ import { HOTEL_ID } from "@/lib/hotel";
 import { elegir } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
 import { SEL, ROTULO, CAMPO, BARRA } from "../_contexto";
+import Monto from "@/components/Monto";
 
 const TD: React.CSSProperties = { padding: "5px 10px", fontSize: 13, textAlign: "right" };
 const IZQ: React.CSSProperties = { ...TD, textAlign: "left", whiteSpace: "nowrap" };
@@ -309,7 +310,7 @@ export default function CompararBE() {
                       <td style={IZQ}>{l}</td>
                       {V.map(v => (
                         <td key={v.scenario_id} style={TD}>
-                          {usd(v.validacion[k] as number)}
+                          <Monto>{usd(v.validacion[k] as number)}</Monto>
                         </td>
                       ))}
                     </tr>
