@@ -80,6 +80,15 @@ CLUB = {"revenue": "REV_CLUB", "opex": "OPEX_CLUB",
 #: ⚠️ Los rótulos son los del owner, **con sus erratas incluidas** («Total
 #: Operationg expenses», «Miscellaneous  Revenue» con dos espacios). Corregirlas
 #: rompería el cotejo contra su libro, que es para lo que sirve este reporte.
+#:
+#: ⚠️ **Transporte, Innoceana y Sustainability salieron de «Miscellaneous»**
+#: (owner, 2026-10-09: *«puedes darle visibilidad a lo que haya en esta línea…
+#: debe ser separado»*). Esa línea sumaba cuatro departamentos y en Oxygen daba
+#: $148.357, de los cuales **$100.481 eran Transporte** — la cuarta línea de
+#: ingreso de la propiedad, invisible dentro de un renglón rotulado
+#: «misceláneos». El orden en que quedan es el que declara el propio CLAUDE.md
+#: §17.3 para el P&L. Los códigos no se movieron de bloque, así que los
+#: subtotales siguen cuadrando contra sus partes.
 CONSOLIDADO: list[tuple] = [
     ("sec", "REVENUES", []),
     ("det", "Rooms", ["REV_ROOMS", "REV_ROOMS_OTHER"]),
@@ -87,11 +96,13 @@ CONSOLIDADO: list[tuple] = [
     ("det", "SPA", ["REV_SPA"]),
     ("det", "Tours", ["REV_TOURS"]),
     ("det", "Retail-Gift Shop", ["REV_RETAIL", "REV_TIENDA"]),
+    ("det", "Transportation", ["REV_TRANSPORTATION"]),
     ("det", "Madresal Club", ["REV_CLUB"]),
     ("det", "Laundry", ["REV_LAUNDRY"]),
     ("det", "Private Bar", ["REV_PRIVATE_BAR"]),
-    ("det", "Miscellaneous  Revenue", ["REV_MISC_OTHER", "REV_SUSTAINABILITY",
-                                       "REV_TRANSPORTATION", "REV_INNOCEANA"]),
+    ("det", "Innoceana", ["REV_INNOCEANA"]),
+    ("det", "Sustainability Fee", ["REV_SUSTAINABILITY"]),
+    ("det", "Miscellaneous  Revenue", ["REV_MISC_OTHER"]),
     ("esp", "", []),
     ("tot", "TOTAL REVENUES", ["TOTAL_REVENUES"]),
     ("esp", "", []),
@@ -102,12 +113,12 @@ CONSOLIDADO: list[tuple] = [
     ("det", "Tours", ["OPEX_TOURS", "COS_TOURS"]),
     ("det", "Retail-Gift Shop", ["OPEX_RETAIL", "COS_RETAIL",
                                  "OPEX_TIENDA", "COS_TIENDA"]),
+    ("det", "Transportation", ["OPEX_TRANSPORTATION", "COS_TRANSPORTATION"]),
     ("det", "Madresal Club", ["OPEX_CLUB", "COS_CLUB"]),
     ("det", "Laundry", ["OPEX_LAUNDRY", "COS_LAUNDRY"]),
     ("det", "Private Bar", ["OPEX_PRIVATE_BAR", "COS_PRIVATE_BAR"]),
-    ("det", "Miscellaneous  Revenue", ["OPEX_MISCELLANEOUS", "OPEX_TRANSPORTATION",
-                                       "COS_TRANSPORTATION", "OPEX_INNOCEANA",
-                                       "COS_INNOCEANA"]),
+    ("det", "Innoceana", ["OPEX_INNOCEANA", "COS_INNOCEANA"]),
+    ("det", "Miscellaneous  Revenue", ["OPEX_MISCELLANEOUS"]),
     ("esp", "", []),
     ("tot", "Total Operationg expenses", ["TOTAL_OPERATING_EXPENSES"]),
     ("esp", "", []),
@@ -117,11 +128,13 @@ CONSOLIDADO: list[tuple] = [
     ("det", "SPA", ["PROFIT_SPA"]),
     ("det", "Tours", ["PROFIT_TOURS"]),
     ("det", "Retail-Gift Shop", ["PROFIT_RETAIL", "PROFIT_TIENDA"]),
+    ("det", "Transportation", ["PROFIT_TRANSPORTATION"]),
     ("det", "Madresal Club", ["PROFIT_CLUB"]),
     ("det", "Laundry", ["PROFIT_LAUNDRY"]),
     ("det", "Private Bar", ["PROFIT_PRIVATE_BAR"]),
-    ("det", "Miscellaneous  Revenue", ["PROFIT_MISC_OTHER", "PROFIT_SUSTAINABILITY",
-                                       "PROFIT_TRANSPORTATION", "PROFIT_INNOCEANA"]),
+    ("det", "Innoceana", ["PROFIT_INNOCEANA"]),
+    ("det", "Sustainability Fee", ["PROFIT_SUSTAINABILITY"]),
+    ("det", "Miscellaneous  Revenue", ["PROFIT_MISC_OTHER"]),
     ("esp", "", []),
     ("tot", "OPERATING PROFIT", ["OPERATING_PROFIT"]),
     ("esp", "", []),
