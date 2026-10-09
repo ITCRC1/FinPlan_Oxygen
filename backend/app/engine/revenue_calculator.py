@@ -30,6 +30,10 @@ CALENDAR_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 # es lo que permite que la lista se derive en vez de escribirse.
 _OTHER_LINE_TO_FIELD = {ln: ln.lower() for ln in OTHER_REVENUE_LINES}
 
+#: Las que el paquete también puede llenar: el monto mensual se SUMA al
+#: derivado. Ver el comentario en `calculate_revenue`.
+_SUMAN_AL_DERIVADO = {"activities", "transport"}
+
 
 @dataclass
 class RevenueResult:
@@ -58,6 +62,17 @@ class RevenueResult:
     club: Decimal = Decimal("0")
     club_actividad: Decimal = Decimal("0")
     club_visitantes: Decimal = Decimal("0")
+    # Las siete que el P&L sabía mostrar y ningún presupuesto sabía llenar
+    # (owner, 2026-10-08). El mapa `REVENUE_LINE_TO_REPORT_LINE` ya nombraba
+    # cuatro de ellas apuntando a atributos que no existían, así que
+    # `revenue_seed_from_lines` las saltaba en silencio.
+    rooms_other: Decimal = Decimal("0")
+    private_bar: Decimal = Decimal("0")
+    tienda: Decimal = Decimal("0")
+    misc_other: Decimal = Decimal("0")
+    crowther: Decimal = Decimal("0")
+    arec: Decimal = Decimal("0")
+    claro_huerta: Decimal = Decimal("0")
     # KPIs
     rooms_available: int = 0
     rooms_occupied: Decimal = Decimal("0")
@@ -78,7 +93,10 @@ class RevenueResult:
                 # así que las dos cifras se contradecían. Hoy no se nota porque
                 # está en cero en todos los escenarios; se corrige antes de que
                 # haya plata que lo delate.
-                + self.club + self.club_actividad + self.club_visitantes)
+                + self.club + self.club_actividad + self.club_visitantes
+                + self.rooms_other + self.private_bar + self.tienda
+                + self.misc_other + self.crowther + self.arec
+                + self.claro_huerta)
 
     @property
     def occupancy_pct(self) -> Decimal:
@@ -218,9 +236,19 @@ def calculate_revenue(
     # mostraba el ingreso y el P&L seguía en cero. Ahora el mapeo se deriva de
     # las líneas canónicas (`OTHER_REVENUE_LINES`), de manera que un
     # departamento nuevo llega al P&L sin que nadie se acuerde de tocar el motor.
+    # ⚠️ Tours y Transporte pueden venir de los DOS lados: del paquete (lo que
+    # ya incluye la tarifa) y de la venta suelta. Por eso se SUMAN y no se
+    # reemplazan. Un `setattr` acá le borraría a una propiedad con paquete el
+    # tour incluido el día que alguien digite una venta suelta — y el P&L
+    # seguiría cuadrando, contra el número equivocado.
     for oth in other_revenues:
         campo = _OTHER_LINE_TO_FIELD.get(oth.line.upper())
-        if campo is not None:
+        if campo is None:
+            continue
+        if campo in _SUMAN_AL_DERIVADO:
+            previo = getattr(result, campo) or Decimal("0")
+            setattr(result, campo, previo + (oth.amount_usd or Decimal("0")))
+        else:
             setattr(result, campo, oth.amount_usd)
 
     return result

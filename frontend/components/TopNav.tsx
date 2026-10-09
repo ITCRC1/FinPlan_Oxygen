@@ -91,6 +91,10 @@ export const NAV: NavGroup[] = [
       // porque sustituye al motor de paquetes, no lo acompaña.
       { key: "fbPlan", href: "/planning/fb" },
       { key: "club", href: "/revenue/club" },
+      // Las lineas que se digitan (owner 2026-10-08: «todas las lineas de
+      // ingreso deben estar aca»). Va antes del checkbook porque en modo
+      // drivers el checkbook es espejo y esta es la puerta de entrada.
+      { key: "otrosIngresos", href: "/revenue/otros" },
       { key: "totalRevenue", href: "/revenue/total-revenue" },
       { key: "revenueCheckbook", href: "/revenue/checkbook" },
       { key: "payroll", header: true },

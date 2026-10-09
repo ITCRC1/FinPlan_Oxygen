@@ -108,6 +108,7 @@
       "users": "Usuarios",
       "auditActivity": "Auditoría / actividad",
       "club": "Club Madresal (membresías)",
+      "otrosIngresos": "Otros ingresos (se digitan)",
       "origenes": "Orígenes de datos (QuickBooks, backoffice)",
       "monthEndPL": "P&L del mes (Real · Budget · Reforecast)",
       "statistics": "Estadísticas (clase 9)",
@@ -4404,5 +4405,18 @@
     "discountHint": "Comisión del canal sobre la parte que se vende con agencia. El externo no lleva.",
     "commissionable": "Comisionable (%)",
     "serviceHint": "Se cobra al cliente y se entrega al personal. No es ingreso del hotel."
+  },
+  "otrosIngresos": {
+    "title": "Otros ingresos",
+    "intro": "Las líneas de ingreso que se digitan mes a mes: Tours, Transporte, Retail, Lavandería, Misceláneos y las demás que el motor no calcula. En un escenario por drivers esta es la única puerta — el checkbook se reescribe en cada recálculo, así que lo que se digite allá se pierde. Las líneas que tienen su propia pantalla se ven acá pero no se editan.",
+    "line": "Línea",
+    "sheet": "Otros ingresos",
+    "saved": "Guardado.",
+    "recalc": "Recalcular",
+    "recalculated": "Escenario recalculado.",
+    "even": "parejo",
+    "evenHint": "Repite enero en los doce meses.",
+    "driverTag": "la calcula su pantalla",
+    "driverHint": "Esta línea la calcula su propio driver. Editala ahí: si se escribiera en los dos lados, mandaría el último en guardar."
   }
 }

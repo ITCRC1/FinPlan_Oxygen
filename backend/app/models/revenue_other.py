@@ -6,8 +6,15 @@ from app.models.revenue_entry import REVENUE_LINES
 
 # Las líneas que el motor DERIVA: salen de tarifas × ocupación y de la
 # configuración del paquete. No se digitan y no viven acá.
+# ⚠️ `ACTIVITIES` y `TRANSPORT` salieron de acá el 2026-10-08. Derivaban SOLO
+# del paquete, y una propiedad que no vende paquete —Oxygen— no tenía forma de
+# presupuestarlos: $108.521 de Tours y $100.481 de Transporte reales contra
+# cero en el presupuesto, sin ningún aviso. Ahora aceptan además un monto
+# mensual, que en el motor se **suma** al derivado en vez de reemplazarlo
+# (ver `revenue_calculator`): el tour del paquete y el tour suelto son ingreso
+# los dos.
 DERIVED_REVENUE_LINES = (
-    "ROOMS", "FOOD", "BEVERAGE", "ACTIVITIES", "TRANSPORT", "SUSTAINABILITY",
+    "ROOMS", "FOOD", "BEVERAGE", "SUSTAINABILITY",
 )
 
 # Todo lo demás es un **monto mensual**: o lo digita el usuario (Retail,

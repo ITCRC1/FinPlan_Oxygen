@@ -5339,3 +5339,38 @@ export async function fbPlanAlCheckbook(
 ): Promise<{ scenario_id: string; escritas: Record<string, string>; nota: string }> {
   return api.post(`/fb-plan/${scenarioId}/pasar-al-checkbook/`, {});
 }
+
+// ── Ingresos planos: las líneas que se digitan, un monto por mes ─────────────
+//
+// En modo `drivers` el checkbook es un ESPEJO (cada recálculo lo reescribe), así
+// que esta es la única puerta para Tours, Transporte, Retail, Misceláneos y
+// compañía. La lista la arma el backend desde `OTHER_REVENUE_LINES`: una línea
+// nueva aparece sola, sin tocar este archivo.
+export interface IngresoPlanoDTO {
+  line: string;
+  label: string;
+  /** Pantalla que la calcula, si tiene dueño. Entonces acá es de lectura. */
+  driver: string | null;
+  meses: string[];
+  total: string;
+}
+export interface IngresosPlanosResponse {
+  scenario_id: string;
+  locked: boolean;
+  revenue_source: string;
+  lineas: IngresoPlanoDTO[];
+  total: string;
+}
+
+export async function getIngresosPlanos(
+  scenarioId: string,
+): Promise<IngresosPlanosResponse> {
+  return api.get<IngresosPlanosResponse>(`/scenarios/${scenarioId}/revenue/planos/`);
+}
+
+export async function saveIngresosPlanos(
+  scenarioId: string,
+  lineas: { line: string; meses: number[] }[],
+): Promise<IngresosPlanosResponse> {
+  return api.put<IngresosPlanosResponse>(`/scenarios/${scenarioId}/revenue/planos/`, lineas);
+}

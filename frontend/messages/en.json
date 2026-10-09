@@ -108,6 +108,7 @@
       "users": "Users",
       "auditActivity": "Audit / activity",
       "club": "Club Madresal (memberships)",
+      "otrosIngresos": "Other revenue (typed in)",
       "origenes": "Data sources (QuickBooks, back office)",
       "monthEndPL": "Month P&L (Actual · Budget · Reforecast)",
       "statistics": "Statistics (class 9)",
@@ -4404,5 +4405,18 @@
     "discountHint": "Channel commission on the share sold through agencies. Walk-ins carry none.",
     "commissionable": "Commissionable (%)",
     "serviceHint": "Charged to the guest and handed to the staff. Not hotel revenue."
+  },
+  "otrosIngresos": {
+    "title": "Other revenue",
+    "intro": "The revenue lines you type in month by month: Tours, Transportation, Retail, Laundry, Miscellaneous and anything else the engine does not compute. In a driver-based scenario this is the only way in — the checkbook is rewritten on every recalculation, so anything typed there is lost. Lines that have their own screen are shown here but not editable.",
+    "line": "Line",
+    "sheet": "Other revenue",
+    "saved": "Saved.",
+    "recalc": "Recalculate",
+    "recalculated": "Scenario recalculated.",
+    "even": "even",
+    "evenHint": "Repeats January across all twelve months.",
+    "driverTag": "computed by its screen",
+    "driverHint": "This line is computed by its own driver. Edit it there: written in both places, whichever saved last would win."
   }
 }

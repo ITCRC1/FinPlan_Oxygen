@@ -761,6 +761,16 @@ MENSAJES: dict[str, dict[str, str]] = {
     # La captura es una FRACCIÓN. Un 35 escrito donde va 0,35 multiplica el
     # ingreso de comida por cien y la pantalla lo muestra sin pestañear, así que
     # se corta en la puerta y se dice cuál de las tres comidas fue.
+    # Las lineas planas de ingreso. Ver `app/api/ingresos_planos_api.py`.
+    "ingreso.linea_no_es_plana": {
+        "es": "La línea {linea} no se digita: el motor la calcula desde sus propios datos.",
+        "en": "Line {linea} is not typed in: the engine computes it from its own inputs."},
+    "ingreso.linea_con_driver": {
+        "es": "{linea} la calcula su propia pantalla. Editala ahí, no acá — si se escribiera en los dos lados, mandaría el último en guardar y nadie sabría cuál fue.",
+        "en": "{linea} is computed by its own screen. Edit it there, not here — written in both places, whichever saved last would win and nobody would know which."},
+    "ingreso.doce_meses": {
+        "es": "La línea {linea} vino con {cuantos} meses. Son doce, siempre.",
+        "en": "Line {linea} came with {cuantos} months. It is always twelve."},
     "fb.captura_fuera_de_rango": {
         "es": "La captura de {comida} es {valor}. Va entre 0 y 1: 0,35 es «el 35% de los pax toma esa comida».",
         "en": "The {comida} capture rate is {valor}. It goes between 0 and 1: 0.35 means “35% of guests take that meal”."},

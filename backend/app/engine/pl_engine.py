@@ -111,6 +111,7 @@ GROUP_NAMES = {
     "CLUB": "Club Madresal", "AREC": "Área Recreativa",
     "SUSTAINABILITY": "Sustainability Fee",
     "MISC_OTHER": "Other / Misc Revenue",
+    "CLARO_HUERTA": "Claro del Bosque",
     "ADMIN": "Administrations", "SALES": "Sales & Marketing",
     "MAINTENANCE": "Maintenance", "IT": "Information System",
     "UTILITIES": "Utilities", "CAFETERIA": "Cafetería",
@@ -139,6 +140,12 @@ REVENUE_LINE_TO_GROUP: dict[str, str] = {
     "arec": "AREC",
     "sustainability": "SUSTAINABILITY",
     "misc_other": "MISC_OTHER",
+    # «Other Rooms Revenue» es ingreso de habitaciones que no clasifica en un
+    # tipo de villa —upgrades, ajustes, cortesías cobradas—. Es del mismo
+    # centro de utilidad que Rooms y por eso comparte grupo: separarlo le
+    # restaría ingreso al departamento que lo genera.
+    "rooms_other": "ROOMS",
+    "claro_huerta": "CLARO_HUERTA",
 }
 
 # Operating group → representative revenue-line key (for dept-based revenue
@@ -177,6 +184,11 @@ REVENUE_LINE_TO_REPORT_LINE: dict[str, str] = {
     "club": "REV_CLUB", "club_actividad": "REV_CLUB",
     "club_visitantes": "REV_CLUB",
     "arec": "REV_AREC",
+    # Las tres que estaban en `report_line_config` y en ningún mapa: el P&L
+    # tenía la línea dibujada y nada que la llenara (owner, 2026-10-08).
+    "rooms_other": "REV_ROOMS_OTHER",
+    "crowther": "REV_CROWTHER_LAB",
+    "claro_huerta": "REV_CLARO_HUERTA",
     "sustainability": "REV_SUSTAINABILITY",
     "misc_other": "REV_MISC_OTHER",
 }

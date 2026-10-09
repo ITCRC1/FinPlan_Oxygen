@@ -35,12 +35,17 @@ class _Escenario:
 
 
 class _Resultado:
-    """Lo mínimo que `revenue_line_dict` necesita leer."""
+    """Lo mínimo que `revenue_line_dict` necesita leer.
+
+    ⚠️ Los campos se derivan de `REVENUE_LINES` y NO se escriben a mano. Cuando
+    eran una lista propia, agregar una línea de ingreso al sistema dejaba este
+    doble viejo y las dos pruebas de abajo reventaban con un `AttributeError`
+    que no tenía nada que ver con lo que estaban probando.
+    """
     def __init__(self, **kw):
-        for campo in ("rooms", "food", "beverage", "activities", "transport",
-                      "sustainability", "spa", "retail", "fnb_misc",
-                      "innoceana", "laundry", "club", "club_actividad",
-                      "club_visitantes"):
+        from app.models.revenue_entry import REVENUE_LINES
+        for linea in REVENUE_LINES:
+            campo = linea.lower()
             setattr(self, campo, kw.get(campo, Decimal("0")))
 
 

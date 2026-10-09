@@ -43,6 +43,7 @@ from app.api.origenes_api import router as origenes_router
 from app.api.gasto_por_clase_api import router as gasto_clase_router
 from app.api.fb_detalle_api import router as fb_detalle_router
 from app.api.fb_plan_api import router as fb_plan_router
+from app.api.ingresos_planos_api import router as ingresos_planos_router
 from app.api.ingreso_detalle_api import router as ingreso_detalle_router
 from app.api.estadisticas_api import router as estadisticas_router
 from app.api.checkbook_api import router as checkbook_router
@@ -192,6 +193,9 @@ app.include_router(fb_detalle_router, prefix="/api", dependencies=_guard)
 # esto es la PLANIFICACIÓN (pax × precio × captura). Se parecen de nombre y no
 # se tocan: uno lee el mayor, el otro arma el presupuesto.
 app.include_router(fb_plan_router, prefix="/api", dependencies=_guard)
+# Las lineas de ingreso que se digitan (Tours, Retail, Miscelaneos...).
+# En modo `drivers` el checkbook es espejo, asi que esta es su unica puerta.
+app.include_router(ingresos_planos_router, prefix="/api", dependencies=_guard)
 app.include_router(ingreso_detalle_router, prefix="/api", dependencies=_guard)
 app.include_router(estadisticas_router, prefix="/api", dependencies=_guard)
 app.include_router(checkbook_router, prefix="/api", dependencies=_guard)
