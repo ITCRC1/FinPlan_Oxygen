@@ -172,7 +172,58 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
             room_type_units=room_type_units,
         )
     await aplicar_plan_ab(session, scenario, results, channels)
+    await aplicar_spa(session, scenario, results)
     return results
+
+
+async def aplicar_spa(session, scenario, results) -> bool:
+    """El Spa desde su capture rate, con los pax del modelo vivo.
+
+    ## Por que esto no estaba y tenia que estar
+
+    El driver del Spa —pax x capture x precio promedio— sólo corria cuando
+    alguien apretaba guardar en su pantalla. Nada lo recalculaba. Medido en el
+    Budget 2027 de Oxygen el 2026-10-08:
+
+        su propia config:  10% x $150 x 6.643 pax  =  $99.645
+        lo guardado:                                  $30.141  (~2.009 pax)
+
+    La linea no coincidia **con su propia configuracion**. Era una copia de
+    cuando los pax eran otros —la instalacion se clono de Amarena— y se quedo
+    ahi, con una estacionalidad que no era la del escenario. Dos recalculos
+    seguidos no la movieron ni un centavo, y el P&L cuadraba contra ella.
+
+    Es el mismo modo de falla del A&B (ver `aplicar_plan_ab`): un numero que
+    depende de que alguien se acuerde de apretar un boton. Por eso el arreglo va
+    en el recalculo.
+
+    ## Se aplica solo si el driver esta configurado
+
+    Sin filas en `spa_budgets`, o con todo en cero, esto NO toca nada y el monto
+    plano que haya en `RevenueOther` sigue mandando. Una propiedad que digita el
+    Spa a mano no cambia de comportamiento.
+
+    ## Los pax son los del modelo, no los de las estadisticas
+
+    `result.guests` —tarifas x ocupacion— por lo mismo que en A&B: las
+    estadisticas las sincroniza este mismo recalculo mas adelante, asi que leer
+    de ahi haria que el ingreso dependiera de la ultima sincronizacion en vez
+    del modelo.
+    """
+    from app.models.spa_budget import SpaBudget
+
+    filas = {b.month: b for b in (await session.execute(select(SpaBudget).where(
+        SpaBudget.scenario_id == scenario.id))).scalars().all()}
+    if not any((b.capture_pct or ZERO) and (b.avg_price or ZERO)
+               for b in filas.values()):
+        return False
+    for mes, r in results.items():
+        b = filas.get(mes)
+        if b is None:
+            continue
+        monto = (r.guests or ZERO) * (b.capture_pct or ZERO) * (b.avg_price or ZERO)
+        r.spa = Decimal(str(monto)).quantize(Decimal("0.01"))
+    return True
 
 
 async def aplicar_plan_ab(session, scenario, results, channels) -> bool:
@@ -1711,6 +1762,14 @@ async def sincronizar_ingreso_al_checkbook(
     return escritas
 
 
+async def _spa_esta_en_driver(session, scenario) -> bool:
+    """¿El Spa de este escenario lo calcula su capture rate? Ver `aplicar_spa`."""
+    from app.models.spa_budget import SpaBudget
+    filas = (await session.execute(select(SpaBudget).where(
+        SpaBudget.scenario_id == scenario.id))).scalars().all()
+    return any((b.capture_pct or ZERO) and (b.avg_price or ZERO) for b in filas)
+
+
 async def sincronizar_noches(session, scenario, revenue_results,
                              cerrados: set[int] | None = None) -> int:
     """Baja las NOCHES al mismo tiempo que la plata.
@@ -1898,6 +1957,15 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     # Y las NOCHES viajan con la plata. Ver `sincronizar_noches`: sin esto el
     # ingreso queda fresco y el ADR, la ocupación y el equilibrio en noches
     # siguen sobre una foto vieja, en la misma pantalla.
+    # ⚠️ El Spa vive tambien en `RevenueOther`, que es lo que lee la pantalla de
+    # Otros ingresos. Si el recalculo le cambia el monto y no actualiza esa
+    # tabla, la pantalla muestra una cifra y el P&L otra — dos verdades sobre la
+    # misma linea, que es justo lo que `aplicar_spa` vino a cerrar.
+    if await _spa_esta_en_driver(session, scenario):
+        from app.api._ingreso_de_driver import persistir_ingreso_de_driver
+        await persistir_ingreso_de_driver(session, scenario, {
+            "SPA": [revenue_results[m].spa for m in range(1, 13)]})
+
     noches = await sincronizar_noches(session, scenario, revenue_results, cerrados)
     if noches:
         avisos.append(
