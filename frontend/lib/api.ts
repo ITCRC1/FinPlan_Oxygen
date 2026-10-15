@@ -50,10 +50,15 @@ export function dlUrl(path: string): string {
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
+  // ⚠️ Un `FormData` NO lleva `Content-Type` puesto a mano. El navegador lo
+  // arma con el `boundary` que separa las partes; si se lo fijamos nosotros, el
+  // boundary no viaja y el backend recibe un cuerpo que no puede partir —
+  // contesta 422 «field required» sobre un campo que sí se mandó.
+  const esForm = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(esForm ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...localeHeader(),
       ...(init?.headers ?? {}),
@@ -104,6 +109,12 @@ export const api = {
   post:   <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "POST",  body: JSON.stringify(body) }),
   put:    <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PUT",   body: JSON.stringify(body) }),
   patch:  <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+  // ⚠️ Multipart: SIN `Content-Type`. Si se pone, el navegador no agrega el
+  // `boundary` y el backend recibe un cuerpo que no puede partir. Hasta hoy
+  // cada pantalla que subia un archivo rehacia este `fetch` a mano, y cada
+  // copia era una oportunidad de olvidarse del token o del boundary.
+  postForm: <T>(path: string, fd: FormData) => apiFetch<T>(path, { method: "POST", body: fd }),
+  patchForm:<T>(path: string, fd: FormData) => apiFetch<T>(path, { method: "PATCH", body: fd }),
   delete: <T>(path: string)                => apiFetch<T>(path, { method: "DELETE" }),
 };
 
@@ -5373,4 +5384,78 @@ export async function saveIngresosPlanos(
   lineas: { line: string; meses: number[] }[],
 ): Promise<IngresosPlanosResponse> {
   return api.put<IngresosPlanosResponse>(`/scenarios/${scenarioId}/revenue/planos/`, lineas);
+}
+
+// ── Rooms por canal: el modelo alternativo (owner, 2026-10-15) ───────────────
+//
+// Las noches y la tarifa por SEGMENTO DE VENTA, que es lo que el PMS sabe dar.
+// Nada llega al P&L hasta que `rooms_source` pasa a `canales`.
+export interface CanalSegmentoDTO {
+  code: string; nombre: string; orden: number;
+  /** false = ocupa villa pero NO entra al denominador del ADR (CPL, canjes). */
+  genera_ingreso: boolean;
+}
+export interface CanalRoomsMesDTO {
+  month: number;
+  disponibles: string; noches_ingreso: string; noches_totales: string;
+  ingreso: string; ocupacion: string; ocupacion_total: string;
+  adr: string; revpar: string;
+  segmentos: Record<string, Record<string, string>>;
+}
+export interface CanalRoomsEntradaDTO {
+  segmento_code: string; month: number;
+  noches: string; tarifa: string; ingreso: string; tarifa_digitada: boolean;
+}
+export interface CanalRoomsResponse {
+  scenario_id: string;
+  locked: boolean;
+  rooms_source: string;
+  /** true = este escenario toma Rooms de los canales. */
+  conectado: boolean;
+  year: number;
+  segmentos: CanalSegmentoDTO[];
+  meses: CanalRoomsMesDTO[];
+  total: Record<string, unknown>;
+  entradas: CanalRoomsEntradaDTO[];
+}
+
+export async function getCanalRooms(scenarioId: string): Promise<CanalRoomsResponse> {
+  return api.get<CanalRoomsResponse>(`/canal-rooms/${scenarioId}/`);
+}
+
+export async function saveCanalRooms(
+  scenarioId: string,
+  entradas: { segmento_code: string; month: number; noches: number;
+              tarifa: number; ingreso: number; tarifa_digitada: boolean }[],
+): Promise<CanalRoomsResponse> {
+  return api.put<CanalRoomsResponse>(`/canal-rooms/${scenarioId}/`, entradas);
+}
+
+/** El interruptor. NO recalcula: el P&L cambia en el siguiente recálculo. */
+export async function conectarCanalRooms(
+  scenarioId: string, fuente: "tarifas" | "canales",
+): Promise<{ rooms_source: string; nota: string }> {
+  const fd = new FormData();
+  fd.append("fuente", fuente);
+  return api.patchForm(`/canal-rooms/${scenarioId}/fuente/`, fd);
+}
+
+/** Qué versiones trae el libro de Sales. El archivo no sabe de escenarios. */
+export async function versionesDelLibro(
+  scenarioId: string, archivo: File,
+): Promise<{ versiones: string[] }> {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  return api.postForm(`/canal-rooms/${scenarioId}/versiones-del-archivo/`, fd);
+}
+
+/** `aplicar=false` sólo LEE y devuelve lo que encontró. Nada se escribe. */
+export async function importarCanalRooms(
+  scenarioId: string, archivo: File, version: string, aplicar: boolean,
+): Promise<Record<string, unknown>> {
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  fd.append("version", version);
+  fd.append("aplicar", aplicar ? "true" : "false");
+  return api.postForm(`/canal-rooms/${scenarioId}/importar/`, fd);
 }

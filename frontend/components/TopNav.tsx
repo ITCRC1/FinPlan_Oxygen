@@ -90,6 +90,9 @@ export const NAV: NavGroup[] = [
       // pantalla: pax × precio × captura. No va en `/revenue/` como las demás
       // porque sustituye al motor de paquetes, no lo acompaña.
       { key: "fbPlan", href: "/planning/fb" },
+      // Rooms por canal (owner 2026-10-15). Va al lado de A&B porque es el
+      // mismo tipo de pantalla: un modelo alternativo que se conecta o no.
+      { key: "channelRooms", href: "/planning/channel-rooms" },
       { key: "club", href: "/revenue/club" },
       // Las lineas que se digitan (owner 2026-10-08: «todas las lineas de
       // ingreso deben estar aca»). Va antes del checkbook porque en modo
