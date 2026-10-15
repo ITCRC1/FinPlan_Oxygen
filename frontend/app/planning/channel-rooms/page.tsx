@@ -40,8 +40,8 @@ import { HOTEL_ID } from "@/lib/hotel";
 import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import {
   getScenarios, getCanalRooms, saveCanalRooms, conectarCanalRooms,
-  importarCanalRooms, versionesDelLibro,
-  type Scenario, type CanalRoomsResponse,
+  importarCanalRooms, versionesDelLibro, getCanalRoomsEstadisticas,
+  type Scenario, type CanalRoomsResponse, type CanalEstadisticas,
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
 import InputMoneda from "@/components/InputMoneda";
@@ -50,7 +50,8 @@ import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                          "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-const PASOS = ["segmentos", "estadisticas", "mix", "conexion"] as const;
+const PASOS = ["segmentos", "estadisticas", "variaciones", "porSegmento",
+               "mix", "conexion"] as const;
 type Paso = typeof PASOS[number];
 
 const n = (v: string | number | undefined) => {
@@ -107,6 +108,14 @@ export default function ChannelRoomsPage() {
   const [version, setVersion] = useState("");
   const [previo, setPrevio] = useState<Record<string, unknown> | null>(null);
 
+  // ⚠️ Las columnas de los cuadros de Sales son VERSIONES, y en FinPlan cada
+  // version es un ESCENARIO. El pareo lo decide el usuario: el archivo no sabe
+  // de escenarios. Se guarda en la URL para que un enlace lleve la comparacion
+  // puesta — igual que el P&L Detail.
+  const [comparar, setComparar] = useState<string[]>([]);
+  const [est, setEst] = useState<CanalEstadisticas | null>(null);
+  const [cargandoEst, setCargandoEst] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -138,6 +147,21 @@ export default function ChannelRoomsPage() {
   }, [tc]);
 
   useEffect(() => { if (scenarioId) cargar(scenarioId); }, [scenarioId, cargar]);
+
+  const CUADROS: Paso[] = ["estadisticas", "variaciones", "porSegmento", "mix"];
+  useEffect(() => {
+    if (!scenarioId || !CUADROS.includes(paso)) return;
+    let vivo = true;
+    (async () => {
+      setCargandoEst(true);
+      try {
+        const d = await getCanalRoomsEstadisticas(scenarioId, comparar);
+        if (vivo) setEst(d);
+      } catch (e) { if (vivo) setError(e instanceof Error ? e.message : tc("error")); }
+      finally { if (vivo) setCargandoEst(false); }
+    })();
+    return () => { vivo = false; };
+  }, [scenarioId, paso, comparar.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bloqueado = !!data?.locked;
   const segs = data?.segmentos ?? [];
@@ -485,6 +509,272 @@ export default function ChannelRoomsPage() {
     </div>
   );
 
+  // ── El selector de versiones a comparar ───────────────────────────────────
+  const selectorVersiones = (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+                  padding: "8px 10px", marginBottom: 12, borderRadius: 6,
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-medium)" }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+        {t("compareWith")}
+      </span>
+      {scenarios.filter(x => x.id !== scenarioId).map(x => {
+        const on = comparar.includes(x.id);
+        return (
+          <button key={x.id}
+            onClick={() => setComparar(p => on ? p.filter(i => i !== x.id) : [...p, x.id])}
+            style={{ padding: "3px 10px", fontSize: 12, borderRadius: 999,
+              cursor: "pointer",
+              border: on ? "none" : "1px solid var(--border-medium)",
+              background: on ? "var(--brand)" : "transparent",
+              color: on ? "#fff" : "var(--text-secondary)" }}>
+            {x.type} {x.version} {x.year}
+          </button>
+        );
+      })}
+      {comparar.length === 0 && (
+        <span style={{ fontSize: 11.5, color: "var(--text-disabled)" }}>
+          {t("compareHint")}
+        </span>
+      )}
+    </div>
+  );
+
+  const fmtPor = (f: string) => (v: number) =>
+    f === "usd" ? usd(v) : f === "pct" ? pct(v) : ent(v);
+
+  const nombreMes = (m: number) => (m === 13 ? tc("total") : MONTHS[m - 1]);
+
+  /** Un cuadro: filas = meses, columnas = versiones. La forma del libro. */
+  const cuadro = (titulo: string, cols: { etiqueta: string }[],
+                  filas: { month: number; valores: string[] }[],
+                  formato: string) => (
+    <div key={titulo} style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--brand)",
+                    marginBottom: 4 }}>{titulo}</div>
+      <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>
+            <th style={{ ...TH, textAlign: "left", minWidth: 110 }}>{t("month")}</th>
+            {cols.map(c => <th key={c.etiqueta} style={{ ...TH, minWidth: 118 }}>{c.etiqueta}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map(f => (
+            <tr key={f.month} style={{
+              borderBottom: "1px solid var(--border-subtle)",
+              borderTop: f.month === 13 ? "2px solid var(--border-medium)" : undefined,
+              fontWeight: f.month === 13 ? 700 : undefined }}>
+              <td style={{ ...TD, textAlign: "left" }}>{nombreMes(f.month)}</td>
+              {f.valores.map((v, i) => (
+                <td key={i} style={TD}><Monto>{fmtPor(formato)(n(v))}</Monto></td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const vistaCuadros = !est ? <div style={{ padding: 20 }}>{tc("loading")}</div> : (
+    <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+      {selectorVersiones}
+      {est.bloques.map(b => cuadro(b.titulo, est.columnas, b.filas, b.formato))}
+    </div>
+  );
+
+  const vistaVariaciones = !est ? <div style={{ padding: 20 }}>{tc("loading")}</div> : (
+    <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+      {selectorVersiones}
+      {est.variaciones.contra.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{t("needCompare")}</p>
+      ) : (
+        <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+          <thead>
+            <tr>
+              <th style={{ ...TH, textAlign: "left", minWidth: 110 }} rowSpan={2}>{t("month")}</th>
+              {est.variaciones.contra.map(c => (
+                <th key={c.scenario_id} colSpan={4}
+                  style={{ ...TH, borderLeft: "1px solid var(--border-medium)",
+                           textAlign: "center" }}>
+                  {t("vs")} {c.etiqueta}
+                </th>
+              ))}
+            </tr>
+            <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>
+              {est.variaciones.contra.map(c =>
+                est.variaciones.metricas.map(([clave, et], k) => (
+                  <th key={c.scenario_id + clave}
+                    style={{ ...TH, minWidth: 96,
+                      borderLeft: k === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                    {t(`var_${clave}`) || et}
+                  </th>
+                )))}
+            </tr>
+          </thead>
+          <tbody>
+            {est.variaciones.filas.map(f => (
+              <tr key={f.month} style={{
+                borderBottom: "1px solid var(--border-subtle)",
+                borderTop: f.month === 13 ? "2px solid var(--border-medium)" : undefined,
+                fontWeight: f.month === 13 ? 700 : undefined }}>
+                <td style={{ ...TD, textAlign: "left" }}>{nombreMes(f.month)}</td>
+                {f.valores.map(col => col.v.map((v, k) => (
+                  <td key={col.scenario_id + k}
+                    style={{ ...TD,
+                      borderLeft: k === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                    {/* ⚠️ La ocupación va en PUNTOS, no en %: del 20% al 25%
+                        hay cinco puntos, no «+25%». Así lo rotula Sales. */}
+                    <Monto>{k === 3 ? (n(v) * 100).toFixed(1) + " pts" : pct(n(v))}</Monto>
+                  </td>
+                )))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  const vistaPorSegmento = !est ? <div style={{ padding: 20 }}>{tc("loading")}</div> : (
+    <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+      {selectorVersiones}
+      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+        {t("bySegmentNote")}
+      </p>
+      {est.por_segmento.map(sg => (
+        <div key={sg.code} style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--brand)",
+                        marginBottom: 4 }}>{sg.nombre.toUpperCase()}</div>
+          <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                <th style={{ ...TH, textAlign: "left", minWidth: 110 }} rowSpan={2}>{t("month")}</th>
+                <th colSpan={est.columnas.length}
+                  style={{ ...TH, textAlign: "center",
+                           borderLeft: "1px solid var(--border-medium)" }}>{t("revenue")}</th>
+                <th colSpan={est.columnas.length}
+                  style={{ ...TH, textAlign: "center",
+                           borderLeft: "1px solid var(--border-medium)" }}>{t("nights")}</th>
+              </tr>
+              <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>
+                {[0, 1].map(bloque => est.columnas.map((c, i) => (
+                  <th key={bloque + c.scenario_id} style={{ ...TH, minWidth: 108,
+                    borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                    {c.etiqueta}
+                  </th>
+                )))}
+              </tr>
+            </thead>
+            <tbody>
+              {sg.filas.map(f => (
+                <tr key={f.month} style={{
+                  borderBottom: "1px solid var(--border-subtle)",
+                  borderTop: f.month === 13 ? "2px solid var(--border-medium)" : undefined,
+                  fontWeight: f.month === 13 ? 700 : undefined }}>
+                  <td style={{ ...TD, textAlign: "left" }}>{nombreMes(f.month)}</td>
+                  {f.ingreso.map((v, i) => (
+                    <td key={"i" + i} style={{ ...TD,
+                      borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                      <Monto>{usd(n(v))}</Monto></td>
+                  ))}
+                  {f.noches.map((v, i) => (
+                    <td key={"n" + i} style={{ ...TD,
+                      borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                      {ent(n(v))}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+
+  const vistaMixComparado = !est ? <div style={{ padding: 20 }}>{tc("loading")}</div> : (
+    <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+      {selectorVersiones}
+      <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+        <thead>
+          <tr>
+            <th style={{ ...TH, textAlign: "left", minWidth: 220 }} rowSpan={2}>{t("segment")}</th>
+            <th colSpan={est.columnas.length}
+              style={{ ...TH, textAlign: "center",
+                       borderLeft: "1px solid var(--border-medium)" }}>{t("revenue")}</th>
+            <th colSpan={est.columnas.length}
+              style={{ ...TH, textAlign: "center",
+                       borderLeft: "1px solid var(--border-medium)" }}>{t("mix")}</th>
+          </tr>
+          <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>
+            {[0, 1].map(b => est.columnas.map((c, i) => (
+              <th key={b + c.scenario_id} style={{ ...TH, minWidth: 108,
+                borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                {c.etiqueta}
+              </th>
+            )))}
+          </tr>
+        </thead>
+        <tbody>
+          {est.mix.filas.map(f => (
+            <tr key={f.code} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <td style={{ ...TD, textAlign: "left" }}>{f.nombre}</td>
+              {f.ingreso.map((v, i) => (
+                <td key={"i" + i} style={{ ...TD,
+                  borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                  <Monto>{usd(n(v))}</Monto></td>
+              ))}
+              {f.mix.map((v, i) => (
+                <td key={"m" + i} style={{ ...TD,
+                  borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                  {n(v) ? pct(n(v)) : "—"}</td>
+              ))}
+            </tr>
+          ))}
+          <tr style={{ borderTop: "2px solid var(--border-medium)", fontWeight: 700 }}>
+            <td style={{ ...TD, textAlign: "left" }}>{t("totalSegments")}</td>
+            {est.mix.total_segmentos.map((v, i) => (
+              <td key={"t" + i} style={{ ...TD,
+                borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                <Monto>{usd(n(v))}</Monto></td>
+            ))}
+            {est.columnas.map((_c, i) => (
+              <td key={"p" + i} style={{ ...TD,
+                borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                {n(est.mix.total_segmentos[i]) ? "100.0%" : "—"}</td>
+            ))}
+          </tr>
+          <tr style={{ fontWeight: 700 }}>
+            <td style={{ ...TD, textAlign: "left" }}>{t("totalRevenue")}</td>
+            {est.mix.total_ingresos.map((v, i) => (
+              <td key={"ti" + i} style={{ ...TD,
+                borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined }}>
+                <Monto>{usd(n(v))}</Monto></td>
+            ))}
+            <td colSpan={est.columnas.length} />
+          </tr>
+          {/* ⚠️ El chequeo del libro de Sales: «debe ser 0». Distinto de cero
+              significa que hay ingreso fuera de los segmentos de venta — una
+              cortesía con plata, por ejemplo — y el TOTAL no cambia, así que
+              sin esta fila nadie se entera. */}
+          <tr style={{ color: "var(--text-secondary)" }}>
+            <td style={{ ...TD, textAlign: "left" }} title={t("checkHint")}>
+              {t("check")}
+            </td>
+            {est.mix.chequeo.map((v, i) => (
+              <td key={"c" + i} style={{ ...TD,
+                borderLeft: i === 0 ? "1px solid var(--border-medium)" : undefined,
+                color: n(v) ? "var(--negative, #EF5350)" : undefined,
+                fontWeight: n(v) ? 700 : undefined }}>
+                {n(v) ? usd(n(v)) : "0"}</td>
+            ))}
+            <td colSpan={est.columnas.length} />
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="pag pag-ancha" style={{ padding: "20px 24px" }}>
       <IrA esc={scenarioId} />
@@ -545,8 +835,10 @@ export default function ChannelRoomsPage() {
 
       {loading ? <div style={{ padding: 24 }}>{tc("loading")}</div> : (
         paso === "segmentos" ? vistaSegmentos
-        : paso === "estadisticas" ? vistaEstadisticas
-        : paso === "mix" ? vistaMix
+        : paso === "estadisticas" ? vistaCuadros
+        : paso === "variaciones" ? vistaVariaciones
+        : paso === "porSegmento" ? vistaPorSegmento
+        : paso === "mix" ? vistaMixComparado
         : vistaConexion
       )}
     </div>

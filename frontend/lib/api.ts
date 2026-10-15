@@ -5459,3 +5459,45 @@ export async function importarCanalRooms(
   fd.append("aplicar", aplicar ? "true" : "false");
   return api.postForm(`/canal-rooms/${scenarioId}/importar/`, fd);
 }
+
+// ── Los nueve cuadros de «Estadísticas Revenue» (owner, 2026-10-15) ─────────
+//
+// ⚠️ Las columnas son VERSIONES, y en FinPlan cada versión es un ESCENARIO.
+// Por eso el reporte recibe `comparar`: el archivo de Sales no sabe de
+// escenarios y quien decide el pareo es el usuario.
+export interface CanalColumna { scenario_id: string; year: number; etiqueta: string }
+export interface CanalBloque {
+  clave: string; titulo: string;
+  /** usd | pct | num — viaja con el dato para que la pantalla no adivine. */
+  formato: string;
+  filas: { month: number; valores: string[] }[];
+}
+export interface CanalEstadisticas {
+  scenario_id: string;
+  columnas: CanalColumna[];
+  bloques: CanalBloque[];
+  variaciones: {
+    contra: CanalColumna[];
+    metricas: [string, string, boolean][];
+    filas: { month: number; valores: { scenario_id: string; v: string[] }[] }[];
+  };
+  por_segmento: {
+    code: string; nombre: string;
+    filas: { month: number; ingreso: string[]; noches: string[] }[];
+  }[];
+  mix: {
+    filas: { code: string; nombre: string; ingreso: string[]; mix: string[] }[];
+    total_segmentos: string[];
+    total_ingresos: string[];
+    /** El chequeo del libro: suma de segmentos − total. Debe ser 0. */
+    chequeo: string[];
+  };
+}
+
+export async function getCanalRoomsEstadisticas(
+  scenarioId: string, comparar: string[] = [],
+): Promise<CanalEstadisticas> {
+  const q = comparar.length
+    ? `?comparar=${encodeURIComponent(comparar.join(","))}` : "";
+  return api.get<CanalEstadisticas>(`/canal-rooms/${scenarioId}/estadisticas/${q}`);
+}

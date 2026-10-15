@@ -169,6 +169,169 @@ async def _ver(scenario_id: str, db: AsyncSession) -> dict:
     }
 
 
+async def _anio(db: AsyncSession, esc: Scenario) -> dict:
+    """Los doce meses de UN escenario, ya calculados. Pieza del comparativo."""
+    segs = await _segmentos(db, esc.hotel_id)
+    genera = {x.code: bool(x.genera_ingreso) for x in segs}
+    disp = await _disponibles(db, esc)
+    filas = (await db.execute(select(CanalRoomsEntry).where(
+        CanalRoomsEntry.scenario_id == esc.id))).scalars().all()
+    por_mes: dict[int, list] = {m: [] for m in MESES}
+    for f in filas:
+        if 1 <= int(f.month) <= 12:
+            por_mes[int(f.month)].append(f)
+    meses = {m: calcular_mes(por_mes[m], genera, disp[m]) for m in MESES}
+
+    # El año: las magnitudes se SUMAN y los promedios se recalculan sobre las
+    # sumas. Un promedio de promedios no es el promedio — con meses de volumen
+    # muy distinto, el ADR del año saldria corrido varios dolares.
+    n_ing = sum(meses[m]["noches_ingreso"] for m in MESES)
+    n_tot = sum(meses[m]["noches_totales"] for m in MESES)
+    ing = sum(meses[m]["ingreso"] for m in MESES)
+    d_tot = sum(meses[m]["disponibles"] for m in MESES)
+    anio = {
+        "disponibles": d_tot, "noches_ingreso": n_ing, "noches_totales": n_tot,
+        "ingreso": ing,
+        "ocupacion": (n_ing / d_tot) if d_tot else Decimal(0),
+        "ocupacion_total": (n_tot / d_tot) if d_tot else Decimal(0),
+        "adr": (ing / n_ing) if n_ing else Decimal(0),
+        "revpar": (ing / d_tot) if d_tot else Decimal(0),
+        "segmentos": {
+            c: {"noches": sum(meses[m]["segmentos"].get(c, {}).get("noches", Decimal(0))
+                              for m in MESES),
+                "ingreso": sum(meses[m]["segmentos"].get(c, {}).get("ingreso", Decimal(0))
+                               for m in MESES)}
+            for c in genera},
+    }
+    return {"meses": meses, "anio": anio, "segmentos": segs}
+
+
+#: Las metricas que el libro de Sales muestra mes a mes, en su orden.
+BLOQUES = (("ingreso", "TOTAL INGRESOS ($)", "usd"),
+           ("noches_ingreso", "ROOM NIGHTS (noches que generan ingreso)", "num"),
+           ("adr", "TARIFA PROMEDIO · ADR ($)", "usd"),
+           ("ocupacion", "% OCUPACIÓN", "pct"),
+           ("revpar", "RevPAR ($)", "usd"),
+           ("disponibles", "HABITACIONES DISPONIBLES", "num"))
+
+
+@router.get("/canal-rooms/{scenario_id}/estadisticas/")
+async def estadisticas(scenario_id: str, comparar: str = "",
+                       db: AsyncSession = Depends(get_db),
+                       _=Depends(get_current_user)):
+    """Los nueve cuadros de «Estadísticas Revenue», comparando versiones.
+
+    Owner, 2026-10-15: *«revisa nuevamente este tab Estadísticas Revenue y
+    favor recrea todos los reportes que hay ahí»*.
+
+    ⚠️ **Las columnas son VERSIONES, no meses.** En el libro de Sales son seis
+    —Budget 2027, Proyección, OTB, Budget 2026, Real+OTB 2026, Real 2025— y en
+    FinPlan cada una es un ESCENARIO. Por eso el reporte recibe `comparar`: el
+    archivo no sabe de escenarios y quien decide el pareo es el usuario.
+
+    `Real+OTB 2026` no necesita logica propia: en FinPlan es el Forecast con su
+    corte de actuales, que ya mezcla real y proyectado por diseño.
+    """
+    base = await db.get(Scenario, scenario_id)
+    if not base:
+        raise ErrorApi(404, "escenario.no_encontrado")
+    ids = [scenario_id] + [x for x in comparar.split(",") if x.strip()]
+    vistos, orden = set(), []
+    for i in ids:                       # sin repetir, conservando el orden
+        if i not in vistos:
+            vistos.add(i)
+            orden.append(i)
+
+    cols, datos = [], {}
+    for sid in orden:
+        esc = await db.get(Scenario, sid)
+        if not esc:
+            continue
+        cols.append({"scenario_id": sid, "year": esc.year,
+                     "etiqueta": f"{esc.type} {esc.version} {esc.year}"})
+        datos[sid] = await _anio(db, esc)
+    if not cols:
+        raise ErrorApi(404, "escenario.no_encontrado")
+
+    def celda(sid, mes, campo):
+        d = datos[sid]
+        v = d["anio"][campo] if mes == 13 else d["meses"][mes][campo]
+        return _d(v)
+
+    # ── 1 a 6 · las metricas mes a mes ──────────────────────────────────────
+    bloques = [{
+        "clave": campo, "titulo": titulo, "formato": fmt,
+        "filas": [{"month": m,
+                   "valores": [celda(c["scenario_id"], m, campo) for c in cols]}
+                  for m in MESES + [13]],
+    } for campo, titulo, fmt in BLOQUES]
+
+    # ── 7 · variaciones de la BASE contra cada comparado ────────────────────
+    def var(sid, mes, campo, puntos=False):
+        a = Decimal(celda(orden[0], mes, campo))
+        b = Decimal(celda(sid, mes, campo))
+        if puntos:                       # ocupacion: la diferencia es en PUNTOS
+            return _d(a - b)
+        return _d((a - b) / b) if b else "0"
+
+    variaciones = {
+        "contra": [c for c in cols[1:]],
+        "metricas": [("ingreso", "Ingreso %", False), ("noches_ingreso", "Room Nights %", False),
+                     ("adr", "ADR %", False), ("ocupacion", "Ocupación pts", True)],
+        "filas": [{"month": m, "valores": [
+            {"scenario_id": c["scenario_id"],
+             "v": [var(c["scenario_id"], m, campo, pts)
+                   for campo, _et, pts in (("ingreso", "", False),
+                                           ("noches_ingreso", "", False),
+                                           ("adr", "", False),
+                                           ("ocupacion", "", True))]}
+            for c in cols[1:]]} for m in MESES + [13]],
+    }
+
+    # ── 8 · por segmento, sin los que no generan ingreso ────────────────────
+    segs = datos[orden[0]]["segmentos"]
+
+    def seg_val(sid, mes, code, campo):
+        d = datos[sid]
+        src = d["anio"] if mes == 13 else d["meses"][mes]
+        return _d(src["segmentos"].get(code, {}).get(campo, 0))
+
+    por_segmento = [{
+        "code": sg.code, "nombre": sg.nombre,
+        "filas": [{"month": m,
+                   "ingreso": [seg_val(c["scenario_id"], m, sg.code, "ingreso")
+                               for c in cols],
+                   "noches": [seg_val(c["scenario_id"], m, sg.code, "noches")
+                              for c in cols]}
+                  for m in MESES + [13]],
+    } for sg in segs if sg.genera_ingreso]
+
+    # ── 9 · mix del año, y el chequeo contra el total ───────────────────────
+    tot_por_col = [Decimal(datos[c["scenario_id"]]["anio"]["ingreso"]) for c in cols]
+    suma_seg = [sum(Decimal(datos[c["scenario_id"]]["anio"]["segmentos"]
+                            .get(sg.code, {}).get("ingreso", 0))
+                    for sg in segs if sg.genera_ingreso) for c in cols]
+    mix = {
+        "filas": [{
+            "code": sg.code, "nombre": sg.nombre,
+            "ingreso": [_d(datos[c["scenario_id"]]["anio"]["segmentos"]
+                           .get(sg.code, {}).get("ingreso", 0)) for c in cols],
+            "mix": [_d((Decimal(datos[c["scenario_id"]]["anio"]["segmentos"]
+                                .get(sg.code, {}).get("ingreso", 0)) / t) if t else 0)
+                    for c, t in zip(cols, suma_seg)],
+        } for sg in segs if sg.genera_ingreso],
+        "total_segmentos": [_d(v) for v in suma_seg],
+        "total_ingresos": [_d(v) for v in tot_por_col],
+        # ⚠️ El chequeo del libro de Sales: la suma de los segmentos contra el
+        # total. Distinto de cero significa que hay ingreso en un segmento que
+        # el cuadro no esta mostrando — o cortesias con plata, que no deberian.
+        "chequeo": [_d(a - b) for a, b in zip(suma_seg, tot_por_col)],
+    }
+
+    return {"scenario_id": scenario_id, "columnas": cols, "bloques": bloques,
+            "variaciones": variaciones, "por_segmento": por_segmento, "mix": mix}
+
+
 @router.get("/canal-rooms/{scenario_id}/")
 async def ver(scenario_id: str, db: AsyncSession = Depends(get_db),
               _=Depends(get_current_user)):

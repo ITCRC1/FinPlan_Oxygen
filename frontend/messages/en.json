@@ -4450,7 +4450,22 @@
     "apply": "Apply",
     "previewFound": "Found {celdas} cells with data across {meses} months.",
     "unknownSegments": "Segments in the file that are not in the catalog",
-    "imported": "Imported."
+    "imported": "Imported.",
+    "step_variaciones": "Variances",
+    "step_porSegmento": "By segment",
+    "month": "Month",
+    "vs": "vs",
+    "compareWith": "Compare against:",
+    "compareHint": "Pick one or more versions to see the comparison columns.",
+    "needCompare": "Pick at least one version to compare above.",
+    "var_ingreso": "Revenue %",
+    "var_noches_ingreso": "Room Nights %",
+    "var_adr": "ADR %",
+    "var_ocupacion": "Occupancy pts",
+    "bySegmentNote": "Comps excluded: only the segments that bill.",
+    "totalSegments": "Total segments",
+    "check": "Check vs total revenue (must be 0)",
+    "checkHint": "If it is not zero there is revenue outside the sales segments — a comp carrying money, for instance. The total does not change, so without this row nobody finds out."
   },
   "otrosIngresos": {
     "title": "Other revenue",

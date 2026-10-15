@@ -4450,7 +4450,22 @@
     "apply": "Aplicar",
     "previewFound": "Se encontraron {celdas} celdas con dato en {meses} meses.",
     "unknownSegments": "Segmentos del archivo que no están en el catálogo",
-    "imported": "Importado."
+    "imported": "Importado.",
+    "step_variaciones": "Variaciones",
+    "step_porSegmento": "Por segmento",
+    "month": "Mes",
+    "vs": "vs",
+    "compareWith": "Comparar contra:",
+    "compareHint": "Elegí una o más versiones para ver las columnas de comparación.",
+    "needCompare": "Elegí al menos una versión para comparar arriba.",
+    "var_ingreso": "Ingreso %",
+    "var_noches_ingreso": "Room Nights %",
+    "var_adr": "ADR %",
+    "var_ocupacion": "Ocupación pts",
+    "bySegmentNote": "Sin cortesías: sólo los segmentos que facturan.",
+    "totalSegments": "Total segmentos",
+    "check": "Chequeo vs ingreso total (debe ser 0)",
+    "checkHint": "Si no da cero hay ingreso fuera de los segmentos de venta — una cortesía con plata, por ejemplo. El total no cambia, así que sin esta fila nadie se entera."
   },
   "otrosIngresos": {
     "title": "Otros ingresos",
