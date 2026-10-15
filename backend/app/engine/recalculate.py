@@ -171,9 +171,86 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
             other_revenues=[ot for ot in other_revenues if ot.month == month],
             room_type_units=room_type_units,
         )
+    # ⚠️ El ORDEN importa: Rooms primero. A&B y Spa se calculan sobre los pax,
+    # y los pax salen de las noches — que en el modelo por canal las pone este
+    # paso. Al reves, A&B y Spa quedarian sobre los pax del modelo viejo.
+    await aplicar_canales_rooms(session, scenario, results, rate_cards)
     await aplicar_plan_ab(session, scenario, results, channels)
     await aplicar_spa(session, scenario, results)
     return results
+
+
+async def aplicar_canales_rooms(session, scenario, results, rate_cards) -> bool:
+    """ROOMS desde los segmentos de venta, cuando el escenario lo pide.
+
+    Owner, 2026-10-15: *«no tenemos historial por tipo de habitacion como si
+    tengo en FinPlan CWL… Sales and Marketing me proponen hacerlo de otra
+    manera, por canal»*.
+
+    ## Los dos modelos y el interruptor
+
+    El camino normal saca Rooms de `rack x ocupacion x factor de canal`, y eso
+    necesita historia POR TIPO DE HABITACION para calibrarse. Oxygen, Ojochal y
+    Amarena no la tienen y no la van a tener hacia atras. El modelo por canal
+    pide lo que el PMS si sabe dar: noches y tarifa promedio por segmento.
+
+    **La condicion es `scenario.rooms_source`, no la propiedad ni el año.** Sin
+    `'canales'` esto NO toca nada y CWL sigue con el suyo — que es el bueno
+    para quien tiene la historia.
+
+    ## Los pax se reescalan, no se pisan
+
+    A&B y Spa se calculan sobre `guests`. Si se cambian las noches y los pax no,
+    el hotel queda con la ocupacion de un modelo y los comensales del otro — dos
+    verdades sobre el mismo mes. Se conserva la relacion pax/noche que declaran
+    las tarifas y se aplica a las noches nuevas.
+
+    ## Las noches disponibles NO se tocan
+
+    Salen de unidades x dias y son las mismas en los dos modelos. Recalcularlas
+    aca abriria la puerta a que los dos caminos difieran en el denominador de la
+    ocupacion, que es de los errores que cuadran solos.
+    """
+    if getattr(scenario, "rooms_source", "tarifas") != "canales":
+        return False
+
+    from app.models.canal_rooms import (CanalSegmento, CanalRoomsEntry,
+                                        calcular_mes)
+
+    segs = (await session.execute(select(CanalSegmento).where(
+        CanalSegmento.hotel_id == scenario.hotel_id,
+        CanalSegmento.activo.is_(True)))).scalars().all()
+    if not segs:
+        return False
+    genera = {x.code: bool(x.genera_ingreso) for x in segs}
+
+    filas = (await session.execute(select(CanalRoomsEntry).where(
+        CanalRoomsEntry.scenario_id == scenario.id))).scalars().all()
+    if not filas:
+        return False
+    por_mes: dict[int, list] = {}
+    for f in filas:
+        por_mes.setdefault(int(f.month), []).append(f)
+
+    for mes, r in results.items():
+        calc = calcular_mes(por_mes.get(mes, []), genera, r.rooms_available)
+        # pax por noche: lo que declaran las tarifas del mes; si el mes no tiene
+        # tarifas, lo que ya traia el resultado; y si no, 2 — el de Oxygen.
+        del_mes = [rc for rc in rate_cards if rc.month == mes]
+        if del_mes:
+            ratio = sum((Decimal(str(rc.pax_per_room or 0)) for rc in del_mes),
+                        ZERO) / Decimal(len(del_mes))
+        elif r.rooms_occupied:
+            ratio = Decimal(str(r.guests or 0)) / Decimal(str(r.rooms_occupied))
+        else:
+            ratio = Decimal("2")
+
+        r.rooms = Decimal(str(calc["ingreso"])).quantize(Decimal("0.01"))
+        # ⚠️ Las noches de CORTESIA ocupan la villa: van a la ocupacion. Las que
+        # no generan ingreso quedan fuera del ADR por `calcular_mes`, no aca.
+        r.rooms_occupied = Decimal(str(calc["noches_totales"]))
+        r.guests = (r.rooms_occupied * ratio).quantize(Decimal("0.01"))
+    return True
 
 
 async def aplicar_spa(session, scenario, results) -> bool:

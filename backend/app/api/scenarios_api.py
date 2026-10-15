@@ -46,6 +46,7 @@ from app.models.statistical_entry import StatisticalEntry
 from app.models.club_membership_stat import ClubMembershipStat
 from app.models.club_fee_budget import ClubFeeBudget
 from app.models.fb_plan import FbPlanConfig, FbPlanMes
+from app.models.canal_rooms import CanalRoomsEntry, CanalSegmento
 from app.models.pl_manual_input import PLManualInput
 from app.models.actual_entry import ActualEntry
 from app.models.actual_pl_line import ActualPLLine
@@ -152,7 +153,15 @@ COPY_DATASETS: dict[str, list] = {
                  # Es modelo de ingresos por el mismo motivo que el Spa y el
                  # Club: sin él, copiar un Budget deja la comida en cero y el
                  # P&L pierde un departamento entero sin decir por qué.
-                 FbPlanConfig, FbPlanMes],
+                 FbPlanConfig, FbPlanMes,
+                 # Rooms por canal: noches y tarifa por segmento de venta. Es
+                 # el modelo de ingreso de Rooms para las propiedades sin
+                 # historia por tipo de habitación, así que copiar un Budget
+                 # sin esto dejaría el hotel sin habitaciones — la línea más
+                 # grande del P&L — en los escenarios que ya lo usan.
+                 # ⚠️ `CanalSegmento` NO viaja: es catálogo de la PROPIEDAD,
+                 # no del escenario, igual que el catálogo de cuentas.
+                 CanalRoomsEntry],
     # El conteo de socios del Club viaja con los estadísticos: al copiar un
     # Budget, la proyección de socios (121 → 129) es parte del plan, igual
     # que la ocupación proyectada.

@@ -50,6 +50,15 @@ class Scenario(Base):
     # (the revenue engine); 'checkbook' = read direct USD amounts from RevenueEntry
     # (KPIs come from ScenarioStat). Default keeps existing scenarios on drivers.
     revenue_source: Mapped[str] = mapped_column(String(12), default="drivers")
+    # De donde sale ROOMS dentro del camino de drivers (owner, 2026-10-15):
+    #   'tarifas' = rack por tipo de habitacion x ocupacion x factor de canal.
+    #               Necesita historia POR TIPO DE HABITACION para calibrarse;
+    #               es lo que CWL tiene y por eso se queda con este.
+    #   'canales' = noches y tarifa promedio POR SEGMENTO DE VENTA, que es lo
+    #               que el PMS si sabe dar. Oxygen, Ojochal y Amarena no tienen
+    #               —ni van a tener hacia atras— la historia por tipo de villa.
+    # ⚠️ Default 'tarifas': nadie cambia de modelo sin decirlo.
+    rooms_source: Mapped[str] = mapped_column(String(10), default="tarifas")
     source_file: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_by: Mapped[str] = mapped_column(String(100), default="")

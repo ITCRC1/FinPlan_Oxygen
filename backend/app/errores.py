@@ -762,6 +762,22 @@ MENSAJES: dict[str, dict[str, str]] = {
     # ingreso de comida por cien y la pantalla lo muestra sin pestañear, así que
     # se corta en la puerta y se dice cuál de las tres comidas fue.
     # Las lineas planas de ingreso. Ver `app/api/ingresos_planos_api.py`.
+    # Rooms por canal. Ver `app/api/canal_rooms_api.py`.
+    "canal.segmento_desconocido": {
+        "es": "El segmento {code} no está en el catálogo de esta propiedad. Agregalo primero o corregí el nombre: una línea de venta sin catálogo no llega a ningún reporte.",
+        "en": "Segment {code} is not in this property's catalog. Add it first or fix the name: a sales line with no catalog entry reaches no report."},
+    "canal.noches_negativas": {
+        "es": "Las noches de {code} en el mes {mes} son negativas. Una noche que no se vendió es cero, no menos.",
+        "en": "Nights for {code} in month {mes} are negative. A night that was not sold is zero, not less."},
+    "canal.fuente_desconocida": {
+        "es": "«{fuente}» no es una fuente de Rooms. Las que hay son: {validas}.",
+        "en": "“{fuente}” is not a Rooms source. The available ones are: {validas}."},
+    "canal.version_vacia": {
+        "es": "La versión «{version}» del archivo no trae ningún dato por segmento. Revisá que sea la columna correcta.",
+        "en": "Version “{version}” of the file carries no segment data. Check that it is the right column."},
+    "canal.recalcular_despues": {
+        "es": "Fuente de Rooms cambiada. Recalculá para que el P&L la tome.",
+        "en": "Rooms source changed. Recalculate so the P&L picks it up."},
     "ingreso.linea_no_es_plana": {
         "es": "La línea {linea} no se digita: el motor la calcula desde sus propios datos.",
         "en": "Line {linea} is not typed in: the engine computes it from its own inputs."},
