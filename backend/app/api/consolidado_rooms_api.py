@@ -168,6 +168,15 @@ async def rooms_rack_rooms(scenario_id: str, db: AsyncSession = Depends(get_db),
         "contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME,
         "year": d.get("year"), "conectado": d.get("conectado"), "hay_tarifario": d.get("hay_tarifario"),
         "villas": d.get("villas") or [], "temporadas": d.get("temporadas") or [],
+        # ⚠️ Cómo llama ESTA propiedad a cada casilla, y cuáles usa. Sin esto,
+        # Hotel Consolidation lee «Verde» donde Oxygen vende «Baja»: el número
+        # viaja bien y el rótulo no, que es la peor de las dos.
+        #
+        # La lista de abajo es a mano A PROPÓSITO —`entradas` no sale de acá,
+        # y por eso no se deriva de `_ver`—, así que una llave nueva no viaja
+        # sola. Lo vigila `test_la_etiqueta_viaja_al_consolidado`.
+        "temporada_etiquetas": d.get("temporada_etiquetas") or {},
+        "temporadas_usadas": d.get("temporadas_usadas") or [],
         "segmentos": d.get("segmentos") or [], "comisiones": d.get("comisiones") or [],
         "meses": d.get("meses") or [], "total": d.get("total") or {}, "controles": d.get("controles") or {},
         "leido_por": quien,

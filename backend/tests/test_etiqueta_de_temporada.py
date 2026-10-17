@@ -113,3 +113,24 @@ def test_el_motor_no_mira_la_etiqueta():
         "el motor del tarifario empezó a mirar la etiqueta: dos escenarios "
         "con nombres distintos sobre la misma casilla darían números "
         "distintos con el mismo tarifario")
+
+
+def test_la_etiqueta_viaja_al_consolidado():
+    """La puerta del consolidado re-arma el cuadro llave por llave.
+
+    Esa lista es a mano **a propósito**: `entradas` no sale de ahí, y el
+    comentario de la ruta lo dice — «solo totales por mes y segmento; sin
+    reservas ni huéspedes». O sea que no se puede derivar de `_ver`.
+
+    El precio de esa decisión es que una llave nueva no viaja sola. Owner,
+    2026-10-15: *«me preocupa que siempre haya datos que no viajen… o viajen
+    mal»*. Con el rótulo de la temporada el número viaja bien y el nombre no,
+    que es la peor de las dos: Hotel Consolidation diría «Verde» donde Oxygen
+    vende «Baja», y nada fallaría.
+    """
+    src = inspect.getsource(
+        __import__("app.api.consolidado_rooms_api", fromlist=["x"]).rooms_rack_rooms)
+    for clave in ("temporada_etiquetas", "temporadas_usadas"):
+        assert f'"{clave}"' in src, (
+            f"«{clave}» dejó de viajar al consolidado: el tarifario llega con "
+            f"los nombres de otra propiedad")
