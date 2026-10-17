@@ -90,6 +90,10 @@ class RackTemporada(Base):
     temporada: Mapped[str] = mapped_column(String(10))
     desde: Mapped[date] = mapped_column(Date)
     hasta: Mapped[date] = mapped_column(Date)
+    #: Cómo llama ESTA propiedad a esta casilla. Oxygen pone «Baja» sobre la
+    #: casilla VERDE; Ojochal pone «Verde». Es decorado: la tarifa sale de
+    #: `temporada`, nunca de acá. Vacía = se usa el nombre de la casilla.
+    etiqueta: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class RackVilla(Base):

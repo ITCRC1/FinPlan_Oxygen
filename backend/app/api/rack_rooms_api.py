@@ -387,7 +387,17 @@ def _armar(esc, segs, villas, temps, coms, filas, unidades_hotel) -> dict:
                     "rac_verde": _d(v.rac_verde), "orden": v.orden}
                    for v in villas],
         "temporadas": [{"temporada": t.temporada, "desde": t.desde.isoformat(),
-                        "hasta": t.hasta.isoformat()} for t in temps],
+                        "hasta": t.hasta.isoformat(),
+                        "etiqueta": t.etiqueta or ""} for t in temps],
+        # Cómo llama ESTA propiedad a cada casilla, derivado de los rangos: el
+        # primero que traiga etiqueta manda. Una casilla sin rango no aparece
+        # acá, y la pantalla la esconde — así Oxygen muestra dos temporadas y
+        # Ojochal tres sin que ninguna de las dos esté escrita en el código.
+        "temporada_etiquetas": {
+            t.temporada: t.etiqueta
+            for t in reversed(temps) if (t.etiqueta or "").strip()},
+        "temporadas_usadas": sorted({t.temporada for t in temps},
+                                    key=TEMPORADAS.index),
         # Una fila por segmento y mes. La pantalla muestra enero y marca los
         # meses que se apartan — ver `guardar_comisiones`.
         "comisiones": [{"segmento_code": c.segmento_code,
@@ -474,6 +484,8 @@ class TemporadaBody(BaseModel):
     temporada: str
     desde: date
     hasta: date
+    #: Decorado. La tarifa sale de `temporada`; ver `RackTemporada.etiqueta`.
+    etiqueta: str = ""
 
 
 @router.put("/rack-rooms/{scenario_id}/temporadas/")
@@ -510,7 +522,9 @@ async def guardar_temporadas(scenario_id: str, body: list[TemporadaBody],
     await db.flush()
     for t in body:
         db.add(RackTemporada(scenario_id=scenario_id, hotel_id=esc.hotel_id,
-                             temporada=t.temporada, desde=t.desde, hasta=t.hasta))
+                             temporada=t.temporada, desde=t.desde,
+                             hasta=t.hasta,
+                             etiqueta=(t.etiqueta or "").strip() or None))
     await db.flush()
     await _rederivar(db, esc, user)
     await db.commit()

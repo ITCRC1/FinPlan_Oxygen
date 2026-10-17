@@ -5515,6 +5515,8 @@ export interface RackVillaFila {
 }
 export interface RackTemporadaFila {
   temporada: string; desde: string; hasta: string;
+  /** Cómo llama ESTA propiedad a la casilla. Oxygen: «Baja» sobre VERDE. */
+  etiqueta?: string;
 }
 export interface RackComisionFila {
   segmento_code: string;
@@ -5578,6 +5580,10 @@ export interface RackRoomsResponse {
   hay_tarifario: boolean;
   villas: RackVillaFila[];
   temporadas: RackTemporadaFila[];
+  /** Derivado de los rangos: casilla → nombre que usa la propiedad. */
+  temporada_etiquetas: Record<string, string>;
+  /** Las casillas que esta propiedad realmente usa. Oxygen tiene dos. */
+  temporadas_usadas: string[];
   comisiones: RackComisionFila[];
   segmentos: RackSegmento[];
   entradas: { segmento_code: string; month: number;

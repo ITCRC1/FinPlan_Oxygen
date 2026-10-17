@@ -111,6 +111,27 @@ export default function RackRoomsPage() {
   // controlado no deja escribir «0.», ni borrar el campo para teclear otra cosa.
   const [villas, setVillas] = useState<RackVillaFila[]>([]);
   const [temps, setTemps] = useState<RackTemporadaFila[]>([]);
+
+  /** Cómo llama ESTA propiedad a una casilla.
+   *
+   * ⚠️ Las casillas son tres —`PICO`, `ALTA`, `VERDE`— porque Ojochal vende
+   * con tres niveles de tarifa. Oxygen vende con dos y los llama «Alta» y
+   * «Baja». El nombre viene del escenario; si no lo trae, se usa el del
+   * idioma. Escribir acá «Baja» arreglaría Oxygen y rompería Ojochal. */
+  const nombreTemp = useCallback((casilla: string) => {
+    const propio = temps.find(x => x.temporada === casilla
+                                   && (x.etiqueta ?? "").trim())?.etiqueta;
+    return (propio ?? "").trim() || t(`season${casilla}`);
+  }, [temps, t]);
+
+  /** Las casillas con al menos un rango. Una casilla que nadie usa no se
+   *  muestra: Oxygen ve dos columnas de RAC, Ojochal tres, y ninguna de las
+   *  dos cantidades está escrita en el código. */
+  const tempsUsadas = useMemo(() => {
+    const con = new Set(temps.map(x => x.temporada));
+    const vistas = TEMPORADAS.filter(x => con.has(x));
+    return vistas.length ? vistas : [...TEMPORADAS];
+  }, [temps]);
   const [coms, setComs] = useState<Record<string, Record<number, string>>>({});
   const [propiaDe, setPropiaDe] = useState<Record<string, boolean>>({});
   const [noches, setNoches] = useState<Record<string, Record<number, string>>>({});
@@ -232,8 +253,14 @@ export default function RackRoomsPage() {
     });
   }, [conTarifaPropia]);
 
-  /** El cuadro de villas: columnas = unidades, RAC pico, alta, verde. */
-  const COLS_VILLA = ["unidades", "rac_pico", "rac_alta", "rac_verde"] as const;
+  /** El cuadro de villas: unidades + un RAC por cada casilla que se usa.
+   *
+   * ⚠️ Las columnas SON las casillas con rango. Si se escribieran las tres
+   * acá, pegar desde Excel un cuadro de dos tarifas metería la segunda en la
+   * casilla equivocada — y el RAC ponderado saldría mal sin que nada avise. */
+  const COLS_VILLA = useMemo(
+    () => ["unidades", ...tempsUsadas.map(x => `rac_${x.toLowerCase()}`)],
+    [tempsUsadas]);
   const pegarVillas = useCallback((fi: number, ci: number, bloque: string[][]) => {
     setVillas(xs => {
       const out = xs.map(x => ({ ...x }));
@@ -247,7 +274,7 @@ export default function RackRoomsPage() {
       });
       return out;
     });
-  }, []);
+  }, [COLS_VILLA]);
 
   /** Guarda y recarga. El backend devuelve el cuadro recalculado entero. */
   async function guardar(fn: () => Promise<RackRoomsResponse>) {
@@ -580,9 +607,10 @@ export default function RackRoomsPage() {
                 <thead><tr>
                   <th style={{ textAlign: "left", minWidth: 200 }}>{t("villa")}</th>
                   <th style={{ textAlign: "right" }}>{t("units")}</th>
-                  <th style={{ textAlign: "right" }}>RAC {t("seasonPICO")}</th>
-                  <th style={{ textAlign: "right" }}>RAC {t("seasonALTA")}</th>
-                  <th style={{ textAlign: "right" }}>RAC {t("seasonVERDE")}</th>
+                  {tempsUsadas.map(x => (
+                    <th key={x} style={{ textAlign: "right" }}>
+                      RAC {nombreTemp(x)}
+                    </th>))}
                   <th />
                 </tr></thead>
                 <tbody>
@@ -596,7 +624,8 @@ export default function RackRoomsPage() {
                       </td>
                       {COLS_VILLA.map((k, ki) => (
                         <td key={k} style={TD}>
-                          <input value={String(v[k] ?? "")} disabled={locked} style={inpNum}
+                          <input value={String((v as unknown as Record<string, unknown>)[k] ?? "")}
+                                 disabled={locked} style={inpNum}
                                  onPaste={e => manejarPegado(e, b => pegarVillas(i, ki, b))}
                                  onChange={e => setVillas(xs => xs.map((x, j) =>
                                    j === i ? { ...x, [k]: k === "unidades"
@@ -615,7 +644,7 @@ export default function RackRoomsPage() {
                     <td style={{ ...TD, fontWeight: 700 }}>
                       {fmtInt(villas.reduce((a, v) => a + (v.unidades || 0), 0))}
                     </td>
-                    <td colSpan={4} />
+                    <td colSpan={COLS_VILLA.length} />
                   </tr>
                 </tbody>
               </table>
@@ -661,7 +690,7 @@ export default function RackRoomsPage() {
                                   onChange={e => setTemps(xs => xs.map((y, j) =>
                                     j === i ? { ...y, temporada: e.target.value } : y))}>
                             {TEMPORADAS.map(s =>
-                              <option key={s} value={s}>{t(`season${s}`)}</option>)}
+                              <option key={s} value={s}>{nombreTemp(s)}</option>)}
                           </select>
                         </td>
                         {(["desde", "hasta"] as const).map(k => (
@@ -726,7 +755,9 @@ export default function RackRoomsPage() {
               </p>
               <p style={{ color: "var(--text-secondary)", fontSize: 12, marginBottom: 10 }}>
                 {dirty
-                  ? <span style={{ color: "var(--warning, #F59E0B)" }}>● {t("previewing")}</span>
+                  ? <span style={{ color: "var(--warning, #F59E0B)" }}>
+                      ● {calculando ? t("recalculating") : t("previewing")}
+                    </span>
                   : <span>● {t("saved2")}</span>}
               </p>
 
@@ -1046,9 +1077,9 @@ export default function RackRoomsPage() {
                     {MONTHS.map(m => <th key={m} style={{ textAlign: "right", minWidth: 80 }}>{m}</th>)}
                   </tr></thead>
                   <tbody>
-                    {TEMPORADAS.map(s => (
+                    {tempsUsadas.map(s => (
                       <tr key={s}>
-                        <td style={TDL}>{t("daysIn")} {t(`season${s}`)}</td>
+                        <td style={TDL}>{t("daysIn")} {nombreTemp(s)}</td>
                         {data.meses.map(m => (
                           <td key={m.month} style={TD}>
                             {fmtInt(m.dias_por_temporada[s] ?? 0)}
