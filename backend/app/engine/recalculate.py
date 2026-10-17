@@ -301,7 +301,8 @@ async def aplicar_canales_rooms(session, scenario, results, rate_cards,
                 villas, temps, comisiones_del_mes(filas_com, mes),
                 {f.segmento_code: f.noches for f in delmes},
                 scenario.year, mes,
-                tarifas_propias={f.segmento_code: f.tarifa for f in delmes})
+                tarifas_propias={f.segmento_code: f.tarifa for f in delmes},
+                genera=genera)
             # ⚠️ Por omisión se calcula sobre COPIAS. Esto corre dentro de
             # `load_revenue_results`, que es el camino de LECTURA de
             # `get_monthly_revenue` — la puerta del consolidado. Mutar acá la

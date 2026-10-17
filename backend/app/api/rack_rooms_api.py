@@ -226,12 +226,17 @@ async def _rederivar(db: AsyncSession, esc: Scenario, user=None) -> int:
     for f in filas:
         por_mes.setdefault(int(f.month), []).append(f)
 
+    # Los de CORTESÍA ocupan villa y no cobran. Sin esto, un segmento sin
+    # comisión se lee como 0 % —«vende a rack»— y el CPL entra al ingreso.
+    genera = {s.code: bool(s.genera_ingreso)
+              for s in await _segmentos(db, esc.hotel_id)}
     tocadas = 0
     for mes, delmes in por_mes.items():
         d = derivar_mes(villas, temps, comisiones_del_mes(coms, mes),
                         {f.segmento_code: f.noches for f in delmes},
                         esc.year, mes,
-                        tarifas_propias={f.segmento_code: f.tarifa for f in delmes})
+                        tarifas_propias={f.segmento_code: f.tarifa for f in delmes},
+                        genera=genera)
         for f in delmes:
             s = d["segmentos"].get(f.segmento_code)
             if not s:
@@ -285,7 +290,8 @@ def _armar(esc, segs, villas, temps, coms, filas, unidades_hotel) -> dict:
                                 {f.segmento_code: f.noches for f in delmes},
                                 esc.year, m,
                                 tarifas_propias={f.segmento_code: f.tarifa
-                                                 for f in delmes})["segmentos"]
+                                                 for f in delmes},
+                                genera=genera)["segmentos"]
                     if hay_tarifario and delmes else {})
         # ⚠️ Se calcula sobre lo DERIVADO, no sobre el `ingreso` que trae la
         # fila. Dos razones, y la segunda es la que hizo falta:

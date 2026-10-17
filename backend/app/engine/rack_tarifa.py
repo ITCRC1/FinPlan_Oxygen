@@ -259,7 +259,8 @@ def kpis_rack(segmentos: dict, noches_por_segmento: dict, genera: dict,
 
 
 def derivar_mes(villas, temporadas, comisiones: dict, noches_por_segmento: dict,
-                anio: int, mes: int, tarifas_propias: dict | None = None) -> dict:
+                anio: int, mes: int, tarifas_propias: dict | None = None,
+                genera: dict | None = None) -> dict:
     """Todo el paso 1→8 de un mes, en una llamada.
 
     Devuelve por segmento `{tarifa, ingreso, ingreso_rack}` más el RAC del mes
@@ -270,11 +271,24 @@ def derivar_mes(villas, temporadas, comisiones: dict, noches_por_segmento: dict,
     `comisiones` — {code: (pct, tarifa_propia)}
     `noches_por_segmento` — {code: noches}
     `tarifas_propias` — {code: tarifa} sólo para los de tarifa propia.
+    `genera` — {code: genera_ingreso} del catálogo. Un segmento de CORTESÍA
+        ocupa la villa y **no cobra**: tarifa, ingreso e ingreso rack en cero.
+
+    ⚠️ **La cortesía hay que apagarla acá, no después.** Sin `genera`, un
+    segmento sin comisión cargada se lee como 0 % —o sea «vende a rack»— y el
+    CPL entra al ingreso a tarifa publicada. En Oxygen 2027 eso eran 138
+    noches y **$79.355** que el P&L daba por cobrados. No falla nada: el total
+    cuadra consigo mismo, la ocupación sale bien, y sólo el ADR queda raro
+    —porque esas noches suman al numerador y no al denominador—.
     """
     rac = rac_ponderado(villas, anio, mes, temporadas)
     tp = tarifas_propias or {}
+    gen = genera or {}
     out = {}
     for code, noches in noches_por_segmento.items():
+        if not gen.get(code, True):
+            out[code] = {"tarifa": ZERO, "ingreso": ZERO, "ingreso_rack": ZERO}
+            continue
         pct, propia = comisiones.get(code, (ZERO, False))
         t = tarifa_del_segmento(rac, pct, tp.get(code), propia)
         if propia:
