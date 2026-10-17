@@ -93,6 +93,9 @@ export const NAV: NavGroup[] = [
       // Rooms por canal (owner 2026-10-15). Va al lado de A&B porque es el
       // mismo tipo de pantalla: un modelo alternativo que se conecta o no.
       { key: "channelRooms", href: "/planning/channel-rooms" },
+      // El tarifario RAC: deriva la tarifa que Channel Rooms digita.
+      // Misma tabla de destino, distinta puerta de entrada.
+      { key: "rackRooms", href: "/revenue/rack-rooms" },
       { key: "club", href: "/revenue/club" },
       // Las lineas que se digitan (owner 2026-10-08: «todas las lineas de
       // ingreso deben estar aca»). Va antes del checkbook porque en modo

@@ -119,10 +119,33 @@ async def revenue_results_from_checkbook(
     return results
 
 
-async def load_revenue_results(session, scenario: Scenario) -> dict[int, RevenueResult]:
-    """Compute RevenueResult for all 12 months (mirrors revenue_api)."""
+async def load_revenue_results(session, scenario: Scenario,
+                               persistir: bool = False) -> dict[int, RevenueResult]:
+    """Compute RevenueResult for all 12 months (mirrors revenue_api).
+
+    `persistir` sólo lo manda el RECÁLCULO. El camino de lectura calcula sobre
+    copias: `get_monthly_revenue` —la puerta del consolidado— pasa por acá, y
+    un GET que escribe en la base es un GET en el que no se puede confiar.
+    """
     if getattr(scenario, "revenue_source", "drivers") == "checkbook":
-        return await revenue_results_from_checkbook(session, scenario)
+        # ⚠️ El modelo por canal se aplica TAMBIÉN acá.
+        #
+        # Esta rama hacía `return` directo y se saltaba `aplicar_canales_rooms`.
+        # El efecto no era un error: era un INTERRUPTOR MUERTO. Un escenario en
+        # modo `checkbook` podía quedar con `rooms_source='canales'`, la
+        # pantalla decía «conectado», y el P&L seguía mostrando la línea ROOMS
+        # del checkbook — con el total cuadrando consigo mismo.
+        #
+        # La condición de este modelo es `rooms_source`, y nada más. Es la misma
+        # regla que ya está escrita en `_ingreso_de_driver`: «un departamento no
+        # debería tener que saber en qué modo está su escenario».
+        #
+        # Sin `rate_cards` —el modo checkbook no las usa— el ratio de pax sale
+        # de los pax y noches que ya traía el mes.
+        resultados = await revenue_results_from_checkbook(session, scenario)
+        await aplicar_canales_rooms(session, scenario, resultados, [],
+                                    persistir)
+        return resultados
     sid = scenario.id
     channels = (await session.execute(
         select(SalesChannelConfig).where(SalesChannelConfig.scenario_id == sid)
@@ -174,48 +197,73 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
     # ⚠️ El ORDEN importa: Rooms primero. A&B y Spa se calculan sobre los pax,
     # y los pax salen de las noches — que en el modelo por canal las pone este
     # paso. Al reves, A&B y Spa quedarian sobre los pax del modelo viejo.
-    await aplicar_canales_rooms(session, scenario, results, rate_cards)
+    await aplicar_canales_rooms(session, scenario, results, rate_cards,
+                                persistir)
     await aplicar_plan_ab(session, scenario, results, channels)
     await aplicar_spa(session, scenario, results)
     return results
 
 
-async def aplicar_canales_rooms(session, scenario, results, rate_cards) -> bool:
+class _FilaDerivada:
+    """Una fila de `canal_rooms_entries` con la tarifa ya derivada, EN MEMORIA.
+
+    `calcular_mes` necesita objetos con estos cuatro atributos. Dárselos sueltos
+    es lo que permite derivar sin tocar las filas de la sesión — ver
+    `aplicar_canales_rooms`.
+    """
+    __slots__ = ("segmento_code", "month", "noches", "tarifa", "ingreso")
+
+    def __init__(self, f, tarifa, ingreso):
+        self.segmento_code = f.segmento_code
+        self.month = f.month
+        self.noches = f.noches
+        self.tarifa = tarifa
+        self.ingreso = ingreso
+
+
+async def aplicar_canales_rooms(session, scenario, results, rate_cards,
+                                persistir: bool = False) -> bool:
     """ROOMS desde los segmentos de venta, cuando el escenario lo pide.
 
-    Owner, 2026-10-15: *«no tenemos historial por tipo de habitacion como si
+    Owner, 2026-10-15: *«no tenemos historial por tipo de habitación como sí
     tengo en FinPlan CWL… Sales and Marketing me proponen hacerlo de otra
     manera, por canal»*.
 
     ## Los dos modelos y el interruptor
 
-    El camino normal saca Rooms de `rack x ocupacion x factor de canal`, y eso
-    necesita historia POR TIPO DE HABITACION para calibrarse. Oxygen, Ojochal y
-    Amarena no la tienen y no la van a tener hacia atras. El modelo por canal
-    pide lo que el PMS si sabe dar: noches y tarifa promedio por segmento.
+    El camino normal saca Rooms de `rack × ocupación × factor de canal`, y eso
+    necesita historia POR TIPO DE HABITACIÓN para calibrarse. Ojochal no la
+    tiene y no la va a tener hacia atrás. El modelo por canal pide lo que el
+    PMS sí sabe dar: noches por segmento.
 
-    **La condicion es `scenario.rooms_source`, no la propiedad ni el año.** Sin
-    `'canales'` esto NO toca nada y CWL sigue con el suyo — que es el bueno
-    para quien tiene la historia.
+    **La condición es `scenario.rooms_source`, no la propiedad ni el año.** Sin
+    `'canales'` esto NO toca nada.
+
+    ## En Ojochal la tarifa se DERIVA antes de usarse
+
+    Si el escenario tiene tarifario RAC cargado, las tarifas de
+    `canal_rooms_entries` se recalculan desde él antes de sumar — así editar un
+    RAC o una comisión se ve en el P&L sin tener que tocar la grilla de noches.
+    Sin tarifario, se usa la tarifa guardada, que es el camino de Oxygen.
 
     ## Los pax se reescalan, no se pisan
 
-    A&B y Spa se calculan sobre `guests`. Si se cambian las noches y los pax no,
-    el hotel queda con la ocupacion de un modelo y los comensales del otro — dos
-    verdades sobre el mismo mes. Se conserva la relacion pax/noche que declaran
-    las tarifas y se aplica a las noches nuevas.
+    A&B y Spa se calculan sobre `guests`. Si cambian las noches y los pax no, el
+    hotel queda con la ocupación de un modelo y los comensales del otro: dos
+    verdades sobre el mismo mes.
 
     ## Las noches disponibles NO se tocan
 
-    Salen de unidades x dias y son las mismas en los dos modelos. Recalcularlas
-    aca abriria la puerta a que los dos caminos difieran en el denominador de la
-    ocupacion, que es de los errores que cuadran solos.
+    Salen de unidades × días y son las mismas en los dos modelos. Recalcularlas
+    acá abriría la puerta a que los dos caminos difieran en el denominador de la
+    ocupación, que es de los errores que cuadran solos.
     """
     if getattr(scenario, "rooms_source", "tarifas") != "canales":
         return False
 
-    from app.models.canal_rooms import (CanalSegmento, CanalRoomsEntry,
-                                        calcular_mes)
+    from app.models.canal_rooms import CanalRoomsEntry, CanalSegmento, calcular_mes
+    from app.models.rack_rooms import RackComision, RackTemporada, RackVilla
+    from app.engine.rack_tarifa import derivar_mes
 
     segs = (await session.execute(select(CanalSegmento).where(
         CanalSegmento.hotel_id == scenario.hotel_id,
@@ -232,26 +280,68 @@ async def aplicar_canales_rooms(session, scenario, results, rate_cards) -> bool:
     for f in filas:
         por_mes.setdefault(int(f.month), []).append(f)
 
+    # El tarifario, si lo hay. Las tres tablas tienen que estar: con villas y
+    # sin temporadas el RAC saldría en cero y el ingreso con él.
+    villas = (await session.execute(select(RackVilla).where(
+        RackVilla.scenario_id == scenario.id))).scalars().all()
+    temps = (await session.execute(select(RackTemporada).where(
+        RackTemporada.scenario_id == scenario.id))).scalars().all()
+    filas_com = (await session.execute(select(RackComision).where(
+        RackComision.scenario_id == scenario.id))).scalars().all()
+    hay_tarifario = bool(villas and temps)
+
     for mes, r in results.items():
-        calc = calcular_mes(por_mes.get(mes, []), genera, r.rooms_available)
+        delmes = por_mes.get(mes, [])
+        if hay_tarifario and delmes:
+            # ⚠️ La comisión es POR MES desde la migración 145. Usar la de
+            # enero para los doce devolvería el ingreso de todo el año a la
+            # tarifa de enero, sin error y con el total cuadrando solo.
+            from app.api.rack_rooms_api import comisiones_del_mes
+            d = derivar_mes(
+                villas, temps, comisiones_del_mes(filas_com, mes),
+                {f.segmento_code: f.noches for f in delmes},
+                scenario.year, mes,
+                tarifas_propias={f.segmento_code: f.tarifa for f in delmes})
+            # ⚠️ Por omisión se calcula sobre COPIAS. Esto corre dentro de
+            # `load_revenue_results`, que es el camino de LECTURA de
+            # `get_monthly_revenue` — la puerta del consolidado. Mutar acá la
+            # fila de la sesión dejaba 96 filas sucias en un GET: medido el
+            # 2026-10-16. Hoy escribe los mismos valores que ya estaban, así
+            # que no se ve; el día que difieran, un GET escribe en la base.
+            #
+            # `persistir=True` sólo lo manda el recálculo, que sí quiere dejar
+            # la tabla estándar al día.
+            copias = []
+            for f in delmes:
+                s = d["segmentos"].get(f.segmento_code)
+                if s is None:
+                    copias.append(f)
+                    continue
+                if persistir:
+                    f.tarifa, f.ingreso = s["tarifa"], s["ingreso"]
+                    copias.append(f)
+                else:
+                    copias.append(_FilaDerivada(f, s["tarifa"], s["ingreso"]))
+            delmes = copias
+
+        calc = calcular_mes(delmes, genera, r.rooms_available)
         # pax por noche: lo que declaran las tarifas del mes; si el mes no tiene
-        # tarifas, lo que ya traia el resultado; y si no, 2 — el de Oxygen.
-        del_mes = [rc for rc in rate_cards if rc.month == mes]
-        if del_mes:
-            ratio = sum((Decimal(str(rc.pax_per_room or 0)) for rc in del_mes),
-                        ZERO) / Decimal(len(del_mes))
+        # tarifas, lo que ya traía el resultado; y si no, 2.
+        rc_mes = [rc for rc in rate_cards if rc.month == mes]
+        if rc_mes:
+            ratio = sum((Decimal(str(rc.pax_per_room or 0)) for rc in rc_mes),
+                        Decimal("0")) / Decimal(len(rc_mes))
         elif r.rooms_occupied:
             ratio = Decimal(str(r.guests or 0)) / Decimal(str(r.rooms_occupied))
         else:
             ratio = Decimal("2")
 
         r.rooms = Decimal(str(calc["ingreso"])).quantize(Decimal("0.01"))
-        # ⚠️ Las noches de CORTESIA ocupan la villa: van a la ocupacion. Las que
-        # no generan ingreso quedan fuera del ADR por `calcular_mes`, no aca.
+        # ⚠️ Las noches de CORTESÍA ocupan la villa: van a la ocupación. Las
+        # que no generan ingreso quedan fuera del ADR por `calcular_mes`, no acá.
         r.rooms_occupied = Decimal(str(calc["noches_totales"]))
         r.guests = (r.rooms_occupied * ratio).quantize(Decimal("0.01"))
     return True
-
 
 async def aplicar_spa(session, scenario, results) -> bool:
     """El Spa desde su capture rate, con los pax del modelo vivo.
@@ -354,7 +444,6 @@ async def aplicar_plan_ab(session, scenario, results, channels) -> bool:
         r.food = Decimal(str(calc["food"])).quantize(Decimal("0.01"))
         r.beverage = Decimal(str(calc["beverage"])).quantize(Decimal("0.01"))
     return True
-
 
 def revenue_line_dict(r: RevenueResult) -> dict[str, Decimal]:
     return {
@@ -2021,7 +2110,12 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     alloc_entries = await _recalc_allocations(session, scenario, avisos, cerrados)
     await session.flush()
 
-    revenue_results = await load_revenue_results(session, scenario)
+    # ⚠️ `persistir=True` SÓLO acá: el recálculo sí quiere dejar la tabla
+    # estándar al día. Todo lo demás que pasa por `load_revenue_results` es
+    # LECTURA — `get_monthly_revenue`, la puerta del consolidado, entre otros—
+    # y una lectura que escribe ensucia la sesión de un GET.
+    revenue_results = await load_revenue_results(session, scenario,
+                                                 persistir=True)
     # El ingreso derivado baja al sub-mayor en el MISMO recálculo que lo calcula.
     # Ver `sincronizar_ingreso_al_checkbook`: sin esto el checkbook queda siendo
     # una foto de la última vez que alguien apretó un botón a mano.

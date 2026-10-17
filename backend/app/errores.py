@@ -762,6 +762,33 @@ MENSAJES: dict[str, dict[str, str]] = {
     # ingreso de comida por cien y la pantalla lo muestra sin pestañear, así que
     # se corta en la puerta y se dice cuál de las tres comidas fue.
     # Las lineas planas de ingreso. Ver `app/api/ingresos_planos_api.py`.
+    "rack.archivo_vacio": {
+        "es": "El archivo llegó vacío.",
+        "en": "The file arrived empty."},
+    "rack.archivo_ilegible": {
+        "es": "No se pudo abrir el archivo. Tiene que ser el .xlsx que baja esta misma pantalla, guardado en formato Excel.",
+        "en": "The file could not be opened. It must be the .xlsx this screen downloads, saved in Excel format."},
+    "rack.sin_encabezado": {
+        "es": "El archivo no tiene el encabezado de la plantilla: faltan las columnas «clave» y «Segmento». Bajá la plantilla de nuevo y llenala sobre ese archivo.",
+        "en": "The file is missing the template header: columns «clave» and «Segmento» are not there. Download the template again and fill that file in."},
+    "rack.unidades_negativas": {
+        "es": "La villa «{villa}» tiene unidades negativas.",
+        "en": "Villa “{villa}” has negative units."},
+    "rack.villa_repetida": {
+        "es": "La villa «{villa}» aparece dos veces. Cada villa va una sola vez: repetida, su RAC pesaría doble en el ponderado.",
+        "en": "Villa “{villa}” appears twice. Each villa goes once: repeated, its RAC would count double in the weighted average."},
+    "rack.temporada_desconocida": {
+        "es": "Temporada desconocida: «{temporada}». Las válidas son: {validas}.",
+        "en": "Unknown season: “{temporada}”. Valid ones are: {validas}."},
+    "rack.rango_invertido": {
+        "es": "La temporada «{temporada}» termina antes de empezar.",
+        "en": "Season “{temporada}” ends before it starts."},
+    "rack.temporadas_traslapadas": {
+        "es": "«{a}» y «{b}» se traslapan desde el {desde}. Un día en dos temporadas se cuenta dos veces y el RAC del mes sale inflado.",
+        "en": "“{a}” and “{b}” overlap from {desde}. A day in two seasons is counted twice and the month's RAC comes out inflated."},
+    "rack.comision_fuera_de_rango": {
+        "es": "La comisión de «{code}» es {pct}. Tiene que estar entre 0 y 1 (0.20 = 20%): con 1 el ingreso queda en cero y por encima se vuelve negativo.",
+        "en": "The commission for “{code}” is {pct}. It must be between 0 and 1 (0.20 = 20%): at 1 revenue becomes zero, and above that it turns negative."},
     # Rooms por canal. Ver `app/api/canal_rooms_api.py`.
     "canal.segmento_desconocido": {
         "es": "El segmento {code} no está en el catálogo de esta propiedad. Agregalo primero o corregí el nombre: una línea de venta sin catálogo no llega a ningún reporte.",

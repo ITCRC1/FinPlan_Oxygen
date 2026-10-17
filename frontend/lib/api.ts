@@ -5501,3 +5501,197 @@ export async function getCanalRoomsEstadisticas(
     ? `?comparar=${encodeURIComponent(comparar.join(","))}` : "";
   return api.get<CanalEstadisticas>(`/canal-rooms/${scenarioId}/estadisticas/${q}`);
 }
+
+// ── Planning → Rack Rooms Calculation ────────────────────────────────────────
+//
+// El modelo de Rooms de Ojochal: se digitan unidades, RAC por temporada,
+// comisiones y noches; la tarifa y el ingreso se DERIVAN. Todo lo que devuelve
+// el backend viene como texto para no perder centavos en el float de JS — los
+// montos de este sistema se comparan contra un libro que cierra al centavo.
+
+export interface RackVillaFila {
+  villa: string; unidades: number;
+  rac_pico: string; rac_alta: string; rac_verde: string; orden: number;
+}
+export interface RackTemporadaFila {
+  temporada: string; desde: string; hasta: string;
+}
+export interface RackComisionFila {
+  segmento_code: string;
+  /** 1-12. Son DOCE filas por segmento, una por mes. Al guardar, `undefined`
+   *  significa «es la de enero y se replica a los meses que seguían a enero». */
+  month?: number;
+  comision_pct: string;
+  /** Long term no tiene RAC: su tarifa se digita mes a mes. Es del SEGMENTO,
+   *  no del mes — va igual en las doce filas. */
+  tarifa_propia: boolean;
+}
+export interface RackSegmento {
+  code: string; nombre: string; orden: number;
+  /** `false` = ocupa villa y NO entra al denominador del ADR (CPL, canjes). */
+  genera_ingreso: boolean;
+}
+export interface RackSegmentoMes {
+  noches: string; tarifa: string; ingreso: string;
+  ocupacion: string; ingreso_rack: string;
+}
+/** El lado RACK del mes: contra esto se mide el descuento del canal. */
+export interface RackKpis {
+  ingreso_rack: string; ingreso_neto: string;
+  noches_facturadas: string; noches_tarifa_propia: string;
+  noches_cortesia: string;
+  adr_rack: string;
+  /** El RAC ponderado puro: sin los segmentos que no tienen tarifario. */
+  adr_rack_sin_propias: string;
+  revpar_rack: string; adr_neto: string; revpar_neto: string;
+  comision_usd: string; comision_pct: string;
+  /** `1 − comisión`. Es el número que se mira para negociar con un canal. */
+  pct_rack_retenido: string;
+}
+
+export interface RackMes {
+  month: number; dias: number;
+  dias_por_temporada: Record<string, number>;
+  /** El CONTROL del libro: tiene que dar 0. Un día sin temporada diluye el RAC. */
+  dias_sin_temporada: number;
+  rac_ponderado: string;
+  rac_por_villa: Record<string, string>;
+  disponibles: string; noches_ingreso: string; noches_totales: string;
+  ingreso: string; ocupacion: string; ocupacion_total: string;
+  adr: string; revpar: string;
+  rack: RackKpis;
+  mix_rack: Record<string, string>;
+  segmentos: Record<string, RackSegmentoMes>;
+}
+export interface RackTotal {
+  disponibles: string; noches_ingreso: string; noches_totales: string;
+  ingreso: string; ingreso_rack: string;
+  ocupacion: string; ocupacion_total: string; adr: string; revpar: string;
+  segmentos: Record<string, { noches: string; ingreso: string }>;
+  rack: RackKpis;
+  mix_rack: Record<string, string>;
+}
+export interface RackRoomsResponse {
+  scenario_id: string; year: number; locked: boolean;
+  rooms_source: string; conectado: boolean;
+  /** `false` = faltan villas o temporadas; sin eso el RAC daría cero. */
+  hay_tarifario: boolean;
+  villas: RackVillaFila[];
+  temporadas: RackTemporadaFila[];
+  comisiones: RackComisionFila[];
+  segmentos: RackSegmento[];
+  entradas: { segmento_code: string; month: number;
+              noches: string; tarifa: string; ingreso: string }[];
+  meses: RackMes[];
+  total: RackTotal;
+  controles: {
+    /** Las del hotel son el denominador; las del tarifario ponderan el RAC. */
+    unidades: { hotel: number; tarifario: number; coinciden: boolean };
+    meses_sin_temporada: number[];
+    segmentos_sin_comision: string[];
+  };
+}
+
+export async function getRackRooms(scenarioId: string): Promise<RackRoomsResponse> {
+  return api.get<RackRoomsResponse>(
+    `/rack-rooms/${encodeURIComponent(scenarioId)}/`);
+}
+
+/** ⚠️ REEMPLAZA el cuadro: una villa que no venga en la lista se borra. */
+export async function saveRackVillas(
+  scenarioId: string, filas: RackVillaFila[],
+): Promise<RackRoomsResponse> {
+  return api.put(`/rack-rooms/${encodeURIComponent(scenarioId)}/villas/`, filas);
+}
+
+/** ⚠️ REEMPLAZA los rangos. Una temporada puede traer varios (Pico son dos). */
+export async function saveRackTemporadas(
+  scenarioId: string, filas: RackTemporadaFila[],
+): Promise<RackRoomsResponse> {
+  return api.put(`/rack-rooms/${encodeURIComponent(scenarioId)}/temporadas/`, filas);
+}
+
+export async function saveRackComisiones(
+  scenarioId: string, filas: RackComisionFila[],
+): Promise<RackRoomsResponse> {
+  return api.put(`/rack-rooms/${encodeURIComponent(scenarioId)}/comisiones/`, filas);
+}
+
+/** `tarifa` sólo se toma en los segmentos de tarifa propia; en los demás se ignora. */
+export async function saveRackNoches(
+  scenarioId: string,
+  filas: { segmento_code: string; month: number; noches: number; tarifa?: number }[],
+): Promise<RackRoomsResponse> {
+  return api.put(`/rack-rooms/${encodeURIComponent(scenarioId)}/noches/`, filas);
+}
+
+/** El interruptor. NO recalcula: el P&L cambia en el próximo recálculo. */
+export async function conectarRackRooms(
+  scenarioId: string, fuente: "tarifas" | "canales",
+): Promise<{ scenario_id: string; rooms_source: string; nota: string }> {
+  const form = new FormData();
+  form.append("fuente", fuente);
+  const res = await fetch(
+    `${BASE}/rack-rooms/${encodeURIComponent(scenarioId)}/fuente/`,
+    { method: "PATCH", body: form, headers: authHeaders() });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+/** El cuadro como quedaría con lo tecleado. **No guarda nada.**
+ *
+ * Corre el MISMO armado que `getRackRooms` en el servidor: derivar la fórmula
+ * acá en el navegador tendría dos implementaciones de lo mismo, y el día que
+ * cambie el redondeo una se corrige y la otra no — y lo que se ve deja de ser
+ * lo que se guarda, sin fallar.
+ */
+export async function previewRackRooms(
+  scenarioId: string,
+  noches: { segmento_code: string; month: number; noches: number; tarifa?: number }[],
+  comisiones?: RackComisionFila[],
+): Promise<RackRoomsResponse & { es_preview: boolean }> {
+  return api.post(`/rack-rooms/${encodeURIComponent(scenarioId)}/preview/`,
+                  { noches, comisiones: comisiones ?? [] });
+}
+
+// ── Rack Rooms · la plantilla que baja, se llena y vuelve ────────────────────
+
+/** Baja el .xlsx con lo que hoy está cargado. Por `fetch` y no por `<a href>`
+ *  porque el endpoint pide token. */
+export async function bajarPlantillaRack(
+  scenarioId: string, nombre: string,
+): Promise<void> {
+  const token = getToken();
+  const res = await fetch(
+    `${BASE}/rack-rooms/${encodeURIComponent(scenarioId)}/plantilla.xlsx`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`No se pudo bajar el archivo (HTTP ${res.status})`);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export interface CambioPlantilla {
+  segmento: string; mes?: number; campo: string; antes: string; ahora: string;
+}
+export interface RechazoPlantilla {
+  clave: string; mes?: number; campo?: string; motivo: string;
+}
+
+/** ⚠️ `aplicar = false` (el default) sólo LEE y devuelve qué cambiaría.
+ *  Nada se escribe hasta que alguien mira la lista y vuelve con `true`. */
+export async function subirPlantillaRack(
+  scenarioId: string, archivo: File, aplicar = false,
+): Promise<{ cambios: CambioPlantilla[]; rechazos: RechazoPlantilla[];
+            aplicado: boolean; cuadro?: RackRoomsResponse }> {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const res = await fetch(
+    `${BASE}/rack-rooms/${encodeURIComponent(scenarioId)}/upload/?aplicar=${aplicar}`,
+    { method: "POST", body: form, headers: authHeaders() });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return res.json();
+}

@@ -46,6 +46,7 @@ from app.api.fb_detalle_api import router as fb_detalle_router
 from app.api.fb_plan_api import router as fb_plan_router
 from app.api.ingresos_planos_api import router as ingresos_planos_router
 from app.api.canal_rooms_api import router as canal_rooms_router
+from app.api.rack_rooms_api import router as rack_rooms_router
 from app.api.ingreso_detalle_api import router as ingreso_detalle_router
 from app.api.estadisticas_api import router as estadisticas_router
 from app.api.checkbook_api import router as checkbook_router
@@ -203,6 +204,9 @@ app.include_router(ingresos_planos_router, prefix="/api", dependencies=_guard)
 # Rooms por canal: el modelo alternativo para las propiedades sin historia
 # por tipo de habitacion. Se conecta con `rooms_source` (owner, 2026-10-15).
 app.include_router(canal_rooms_router, prefix="/api", dependencies=_guard)
+# El tarifario RAC: la capa que DERIVA la tarifa de canal_rooms_entries.
+# No es un modelo paralelo — escribe en las mismas tablas (owner, 2026-10-16).
+app.include_router(rack_rooms_router, prefix="/api", dependencies=_guard)
 app.include_router(ingreso_detalle_router, prefix="/api", dependencies=_guard)
 app.include_router(estadisticas_router, prefix="/api", dependencies=_guard)
 app.include_router(checkbook_router, prefix="/api", dependencies=_guard)

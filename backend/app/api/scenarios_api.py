@@ -47,6 +47,7 @@ from app.models.club_membership_stat import ClubMembershipStat
 from app.models.club_fee_budget import ClubFeeBudget
 from app.models.fb_plan import FbPlanConfig, FbPlanMes
 from app.models.canal_rooms import CanalRoomsEntry, CanalSegmento
+from app.models.rack_rooms import RackComision, RackTemporada, RackVilla
 from app.models.pl_manual_input import PLManualInput
 from app.models.actual_entry import ActualEntry
 from app.models.actual_pl_line import ActualPLLine
@@ -161,7 +162,11 @@ COPY_DATASETS: dict[str, list] = {
                  # grande del P&L — en los escenarios que ya lo usan.
                  # ⚠️ `CanalSegmento` NO viaja: es catálogo de la PROPIEDAD,
                  # no del escenario, igual que el catálogo de cuentas.
-                 CanalRoomsEntry],
+                 CanalRoomsEntry,
+                 # El tarifario RAC vive POR ESCENARIO justamente para que el
+                 # Budget 2027 quede congelado con el suyo. Si no viajara,
+                 # copiar un escenario daria noches sin tarifa -> ingreso cero.
+                 RackVilla, RackTemporada, RackComision],
     # El conteo de socios del Club viaja con los estadísticos: al copiar un
     # Budget, la proyección de socios (121 → 129) es parte del plan, igual
     # que la ocupación proyectada.
