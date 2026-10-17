@@ -4481,7 +4481,7 @@
     "driverHint": "Esta línea la calcula su propio driver. Editala ahí: si se escribiera en los dos lados, mandaría el último en guardar."
   },
   "rackRooms": {
-    "intro": "El modelo de Rooms de Ojochal: se digitan unidades, tarifa RAC por temporada, comisiones y noches por segmento. La tarifa neta y el ingreso se derivan.",
+    "intro": "Tarifario RAC: se digitan unidades, tarifa RAC por temporada, comisiones y noches por segmento. La tarifa neta y el ingreso se derivan.",
     "step_villas": "Villas y RAC",
     "step_temporadas": "Temporadas",
     "step_noches": "Noches",

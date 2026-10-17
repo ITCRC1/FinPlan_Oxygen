@@ -167,7 +167,7 @@ class RackComision(Base):
     #: el ingreso mal en direcciones opuestas y el total del año lo disimula.
     month: Mapped[int] = mapped_column(Integer, default=1)
     #: 0.25 = 25%. No se usa si `tarifa_propia`.
-    comision_pct: Mapped[Decimal] = mapped_column(Numeric(6, 4), default=Decimal("0"))
+    comision_pct: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=Decimal("0"))
     #: ⚠️ Es del SEGMENTO, no del mes: *Long term* no tiene RAC en enero y sí en
     #: julio. Está repetido en las doce filas porque la fila es por mes, y el
     #: que escribe lo pone igual en las doce —lo vigila

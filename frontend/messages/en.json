@@ -4481,7 +4481,7 @@
     "driverHint": "This line is computed by its own driver. Edit it there: written in both places, whichever saved last would win."
   },
   "rackRooms": {
-    "intro": "Ojochal's Rooms model: you enter units, RAC rate per season, commissions and nights per segment. Net rate and revenue are derived.",
+    "intro": "RAC tariff: you enter units, RAC rate per season, commissions and nights per segment. Net rate and revenue are derived.",
     "step_villas": "Villas & RAC",
     "step_temporadas": "Seasons",
     "step_noches": "Nights",
