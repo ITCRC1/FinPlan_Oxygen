@@ -5660,6 +5660,31 @@ export async function previewRackRooms(
                   { noches, comisiones: comisiones ?? [] });
 }
 
+/** «Channel Rooms Calculation», bajado como MODELO VIVO.
+ *
+ * Owner, 2026-11-02: *«que esté formulado en forma automático todo… que sólo
+ * se cambie ocupación y ADR para llegar a un total»*.
+ *
+ * ⚠️ No es el cuadro de números que bajaba antes: trae las noches y la tarifa
+ * como entradas y **todo lo demás en fórmula**. Por eso lo arma el backend y
+ * no el navegador — las fórmulas se escriben en el archivo, no se calculan
+ * acá y se pegan. */
+export async function bajarModeloCanalRooms(
+  scenarioId: string, nombre: string,
+): Promise<void> {
+  const token = getToken();
+  const res = await fetch(
+    `${BASE}/canal-rooms/${encodeURIComponent(scenarioId)}/modelo.xlsx`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`No se pudo bajar el archivo (HTTP ${res.status})`);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Rack Rooms · la plantilla que baja, se llena y vuelve ────────────────────
 
 /** Baja el .xlsx con lo que hoy está cargado. Por `fetch` y no por `<a href>`

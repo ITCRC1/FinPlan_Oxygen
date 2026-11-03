@@ -34,13 +34,13 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePlanningScenarioConUrl } from "@/lib/planningScenario";
-import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import { elegir } from "@/lib/escenarioPreferido";
 import { HOTEL_ID } from "@/lib/hotel";
 import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import {
   getScenarios, getCanalRooms, saveCanalRooms, conectarCanalRooms,
   importarCanalRooms, versionesDelLibro, getCanalRoomsEstadisticas,
+  bajarModeloCanalRooms,
   type Scenario, type CanalRoomsResponse, type CanalEstadisticas,
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
@@ -264,28 +264,21 @@ export default function ChannelRoomsPage() {
     finally { setSaving(false); }
   }
 
+  /** Baja la pantalla como MODELO VIVO: noches y tarifa de entrada, el resto
+   *  en fórmula.
+   *
+   *  ⚠️ Antes bajaba NÚMEROS —noches e ingreso ya calculados, sin fórmulas—.
+   *  Servía para mirar, no para trabajar: mover una noche no movía nada y
+   *  había que rehacer la aritmética a mano, que es justo lo que el archivo
+   *  debería evitar. Lo arma el backend, porque las fórmulas se escriben en
+   *  el archivo; calcularlas acá y pegar el resultado devolvería lo mismo de
+   *  antes con otro nombre. */
   async function bajarExcel() {
     const sel = scenarios.find(x => x.id === scenarioId);
-    const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
-    const filas: FilaCuadro[] = [];
-    for (const s of segs) {
-      filas.push({ label: `${s.nombre} · ${t("nights")}`,
-        valores: [...calc.porMes.map(x => x.seg[s.code]?.noches ?? 0),
-                  calc.porMes.reduce((a, x) => a + (x.seg[s.code]?.noches ?? 0), 0)] });
-      filas.push({ label: `${s.nombre} · ${t("revenue")}`,
-        valores: [...calc.porMes.map(x => x.seg[s.code]?.ingreso ?? 0),
-                  calc.porMes.reduce((a, x) => a + (x.seg[s.code]?.ingreso ?? 0), 0)] });
-    }
-    filas.push({ label: t("totalRevenue"), es_total: true,
-      valores: [...calc.porMes.map(x => x.ing), calc.total.ing] });
+    const esc = sel ? `${sel.type}_${sel.version}_${sel.year}` : scenarioId;
     try {
-      await bajarCuadros("Channel_Rooms", [{
-        titulo: t("title"), subtitulo: esc, hoja: t("sheet"),
-        columnas: [{ label: t("segment"), ancho: 34, formato: "texto" },
-                   ...MONTHS.map(m => ({ label: m, ancho: 13, formato: "usd2" as const })),
-                   { label: tc("total"), ancho: 15, formato: "usd2" as const }],
-        filas,
-      }]);
+      await bajarModeloCanalRooms(
+        scenarioId, `Channel_Rooms_${esc}_modelo.xlsx`.replace(/\s+/g, "_"));
     } catch (e) { setError(e instanceof Error ? e.message : tc("error")); }
   }
 

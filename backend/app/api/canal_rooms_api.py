@@ -347,6 +347,61 @@ class EntradaBody(BaseModel):
     tarifa_digitada: bool = True
 
 
+@router.get("/canal-rooms/{scenario_id}/modelo.xlsx")
+async def bajar_modelo(scenario_id: str, db: AsyncSession = Depends(get_db),
+                       _=Depends(get_current_user)):
+    """La pantalla, bajada como MODELO VIVO.
+
+    Owner, 2026-11-02: *«necesito que esta vista se pueda bajar tal cual como
+    se ve pero que esté formulado en forma automático todo… que sólo se cambie
+    ocupación y ADR para llegar a un total»*.
+
+    Lo que baja NO son los números calculados: son las dos entradas —noches y
+    tarifa promedio por segmento y mes— y **todo lo demás en fórmula**. Mover
+    una noche de enero mueve el total del año.
+
+    ⚠️ Es para ANALIZAR, no para volver a subir. Lo que vuelve por
+    `/importar/` es el libro de Sales, que tiene otra forma. Un archivo que
+    parece subible y no lo es se sube igual, así que el nombre lo dice:
+    `..._modelo.xlsx`, no `plantilla`.
+    """
+    from fastapi.responses import Response
+
+    from app.export.canal_rooms_modelo_xlsx import construir_modelo
+    from app.hotel_actual import HOTEL_NAME, hotel_slug
+
+    esc = await db.get(Scenario, scenario_id)
+    if not esc:
+        raise ErrorApi(404, "escenario.no_encontrado")
+    segs = await _segmentos(db, esc.hotel_id)
+    disp = await _disponibles(db, esc)
+    filas = (await db.execute(select(CanalRoomsEntry).where(
+        CanalRoomsEntry.scenario_id == scenario_id))).scalars().all()
+
+    datos = construir_modelo(
+        hotel=HOTEL_NAME,
+        escenario=f"{esc.type} {esc.version} {esc.year}",
+        anio=int(esc.year),
+        segmentos=[{"code": s.code, "nombre": s.nombre,
+                    "genera_ingreso": bool(s.genera_ingreso)} for s in segs],
+        entradas={(f.segmento_code, int(f.month)):
+                  {"noches": f.noches, "tarifa": f.tarifa}
+                  for f in filas if 1 <= int(f.month) <= 12},
+        disponibles=disp,
+        # El termómetro del archivo: cuánto se aparta de lo que hoy tiene el
+        # sistema. Al bajar son centavos —la tarifa guardada está redondeada y
+        # el archivo rehace el ingreso con ella—; después, lo que se cambió.
+        ingreso_sistema=sum(
+            (f.ingreso or Decimal("0")) for f in filas),
+    )
+    nombre = f"{hotel_slug()}_channel_rooms_{esc.year}_modelo.xlsx"
+    return Response(
+        content=datos,
+        media_type="application/vnd.openxmlformats-officedocument."
+                   "spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
 @router.put("/canal-rooms/{scenario_id}/")
 async def guardar(scenario_id: str, body: list[EntradaBody],
                   db: AsyncSession = Depends(get_db),
