@@ -926,11 +926,62 @@ async def pl_by_dept(
     for e in alloc_rows:
         if e.month not in months:
             continue
+        # ⚠️ La 4999 NO entra acá tampoco. Es el crédito que vuelve al ORIGEN,
+        # o sea el espejo de la resta que se acaba de hacer arriba: contarlo
+        # además de restar lo repartido quita el mismo gasto DOS VECES.
+        #
+        # Medido en el Budget 2027 de Oxygen el 2026-11-03, al copiarle el OPEX
+        # del forecast: la lavandería pasó de $0 a $40.065,14 de costo, el
+        # reparto empezó a mover plata y el GOP por departamento se fue
+        # **$39.463,61 ARRIBA** del P&L oficial —$1.113.767,01 contra
+        # $1.074.303,40—. Mientras 0161 estuvo en cero la diferencia era cero y
+        # no se veía; el defecto llevaba meses esperando que el departamento
+        # tuviera gasto.
+        #
+        # El contrato que rompía está escrito en CLAUDE.md: «la suma de los GOP
+        # por depto = GOP total». Y nada fallaba: cada fila cuadraba consigo
+        # misma y el total del reparto seguía dando cero.
+        if str(e.account or "") == "4999":
+            continue
         d = acc(group_for_dept(e.target_dept))
         monto = float(e.amount_usd or 0)
         d["alloc"] += monto
         clase = str(e.account or "")[:1]
         d[{"6": "alloc_payroll", "7": "alloc_opex", "5": "alloc_cost"}.get(clase, "alloc_other")] += monto
+
+    # ── Que ninguna columna del origen quede en negativo ─────────────────────
+    #
+    # La resta de arriba es POR CLASE, y asume que el reparto se contabiliza en
+    # la misma clase de la que salió el gasto. En cafetería se cumple (6025 es
+    # planilla, 7310/7685 opex, 5301 costo). En lavandería NO: el motor reparte
+    # el costo COMPLETO del departamento —planilla incluida— por 7310/7685, o
+    # sea todo clase 7.
+    #
+    # Resultado en Oxygen 2027: a 0161 se le restaban $39.463,61 de un OPEX de
+    # $22.261,62 —quedaba en −$17.201,99— mientras su planilla de $17.803,52 se
+    # quedaba entera. El neto del departamento sí daba bien, pero la pantalla
+    # mostraba un gasto operativo negativo y una planilla que nadie repartió.
+    #
+    # Acá el excedente se absorbe de las otras columnas del MISMO departamento.
+    # El total del departamento no se mueve ni un centavo: sólo deja de estar
+    # repartido entre columnas de una forma que no describe nada.
+    for origen in {o for o, _c in repartido}:
+        d = acc(group_for_dept(origen))
+        for campo in ("opex", "payroll", "cost"):
+            sobra = -d[campo]
+            if sobra <= 0:
+                continue
+            d[campo] = 0.0
+            for otro in ("payroll", "opex", "cost"):
+                if otro == campo or sobra <= 0:
+                    continue
+                toma = min(sobra, max(d[otro], 0.0))
+                d[otro] -= toma
+                sobra -= toma
+            if sobra > 0:
+                # No había de dónde sacarlo: se devuelve a su columna para no
+                # perderlo. Un sobrante que desaparece es el defecto original.
+                d[campo] = -sobra
 
     order = OPERATING_GROUP_ORDER + OVERHEAD_GROUP_ORDER + [g for g in groups if g not in OPERATING_GROUP_ORDER and g not in OVERHEAD_GROUP_ORDER]
     op_set = set(OPERATING_GROUP_ORDER)
