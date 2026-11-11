@@ -853,6 +853,102 @@ export async function editarCuentaEstadistica(
 export async function getEstadisticas(scenarioId: string): Promise<EstadisticasValores> {
   return api.get(`/estadisticas/${scenarioId}/`);
 }
+
+
+// ── Stats de Integrity (clase 9 al mes, desde el Balance de Comprobación) ──
+// Owner, 2026-11-10: «la contabilidad manda» · «solo full month». La pantalla
+// solo LEE: el dato es el del mayor guardado; en Integrity el nivel 6 es el día
+// y el backend lo suma al mes.
+export interface StatsIntegrityCuenta {
+  clave: string;            // código de Integrity sin el día (6 niveles)
+  codigo: string;           // con DD en el lugar del día
+  grupo: string;
+  concepto: string;
+  descripcion: string;
+  depto: string;
+  depto_nombre: string;
+  nivel3: string;
+  nivel4: string;
+  nivel5: string;
+  nivel7: string;
+  unidad: string;
+  estado_finplan: string;
+  en_integrity: boolean;
+  nota: string;
+  cuenta_ingreso: string;
+  meses: (number | null)[];  // 12
+  con_dato: boolean;
+  total: number;
+}
+export interface StatsIntegrityGrupo {
+  grupo: string;
+  concepto: string;
+  unidad: string;
+  cuentas: number;
+  con_dato: number;
+  meses: number[];
+}
+export interface StatsIntegrityVista {
+  anio: number;
+  hotel: string;
+  version_catalogo: string;
+  meses_cargados: number[];
+  grupos: StatsIntegrityGrupo[];
+  cuentas: StatsIntegrityCuenta[];
+  fuera_de_catalogo: { clave: string; grupo: string; depto: string; meses: (number | null)[]; total: number }[];
+  cuentas_con_dato: number;
+}
+export async function getStatsIntegrity(anio: number): Promise<StatsIntegrityVista> {
+  return api.get(`/stats-integrity/${anio}/`);
+}
+
+/** Plan (Budget / Forecast) al lado de Integrity: noches por tipo de habitación
+ *  —Rooms 0110, Villas 0115, Residencias 0116—, tratamientos de Spa y kilos. */
+type Meses = (number | null)[];
+export interface PlanTipoHab {
+  codigo: string; nombre: string; n7: string; unidades: number; cuenta: string;
+  disponibles: Meses; ocupadas: Meses; pax: Meses; ocupacion: Meses; real_ocupadas: Meses;
+}
+export interface PlanVsIntegrity {
+  anio: number;
+  escenario: { id: string; type: string; version: string; year: number; actuals_through: number };
+  fuente: "motor" | "forecast_rodante" | "actual" | "actual_sin_tipo";
+  habitaciones: { depto: string; rotulo: string; tipos: PlanTipoHab[];
+    total: { disponibles: Meses; ocupadas: Meses; pax: Meses; ocupacion: Meses; real_ocupadas: Meses } }[];
+  sin_tipo: { disponibles: Meses; ocupadas: Meses } | null;
+  spa: { plan: Meses; real: Meses; cuentas: string };
+  lavanderia: { plan: { area: string; rotulo: string; cuenta: string; plan: number[] }[];
+    real: Record<string, Meses> };
+  /** Horas regulares: plan = días del mes × 8 × FTE por depto de planilla; real = 9980.
+   *  `horas_por_fte` = las horas de un FTE completo en cada mes (248, 224, 240…). */
+  horas?: { horas_por_fte?: Meses; horas_por_fte_real?: Meses;
+    deptos: { depto: string; nombre: string; plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses }[];
+    total: { plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses } };
+}
+/** El reporte de FTE por depto y puesto de Integrity (owner, 2026-11-10). */
+export interface FtePosicion { depto: string; codigo: string; nombre: string; empleado: string;
+  fte: number[]; horas_plan: number[]; revisar: boolean; nota: string; mapeada: boolean }
+export interface ReporteFte {
+  anio: number;
+  escenario: { id: string; type: string; version: string; year: number };
+  /** Horas de 1 FTE de cada mes: 9979 del escenario o días del mes × 8. */
+  base: number[];
+  set_nombres: Record<string, string>; set_formulas: Record<string, string>;
+  /** ¿Contabilidad registró alguna hora (9980-9986) ese año? */
+  hay_horas: boolean;
+  deptos: { depto: string; nombre: string;
+    puestos: { puesto: string; nombre: string; revisar: boolean; posiciones: FtePosicion[];
+      fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> }[];
+    sin_puesto: FtePosicion[];
+    fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> }[];
+  total: { fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> };
+}
+export async function getReporteFte(anio: number, scenarioId: string): Promise<ReporteFte> {
+  return api.get(`/stats-integrity/${anio}/fte/${scenarioId}/`);
+}
+export async function getPlanVsIntegrity(anio: number, scenarioId: string): Promise<PlanVsIntegrity> {
+  return api.get(`/stats-integrity/${anio}/plan/${scenarioId}/`);
+}
 /** Baja el archivo. Por fetch y no por <a href> porque el endpoint pide token. */
 export async function bajarPlantillaEstadisticas(scenarioId: string): Promise<void> {
   const token = getToken();

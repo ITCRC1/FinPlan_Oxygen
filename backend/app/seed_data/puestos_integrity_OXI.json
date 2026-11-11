@@ -1,0 +1,173 @@
+{
+ "_nota": [
+  "Que puesto de Integrity (nivel 3 de la 9980) corresponde a cada posicion de la planilla de FinPlan. Oxygen (OXI).",
+  "Owner, 2026-11-10: «el FTE debe ser por position y las horas deben ser por position que viene de la contabilidad».",
+  "Base: las 20 posiciones del Budget 2027 Working de Oxygen (export de FinPlan del 2026-10-12). Integrity registra las horas por PUESTO del catalogo del grupo (501 Agente Recepcion), sumando a todas las personas del puesto.",
+  "La llave es depto + nombre de la posicion, sin mayusculas ni espacios de mas: el mismo nombre en otro escenario cae en el mismo puesto.",
+  "⚠️ Los codigos de puesto son los del catalogo de Integrity del grupo (los mismos de CWL). Falta confirmar que Oxygen tenga la cuenta 9980 de cada puesto: eso lo dice el export «STATS ... 2027» de Oxygen, que todavia no esta.",
+  "puesto_nombre = el nombre del puesto en Integrity, para mostrarlo mientras no haya catalogo de estadisticas de Oxygen.",
+  "revisar = propuesta de Claude, no confirmada por el owner."
+ ],
+ "mapa": [
+  {
+   "depto": "0111",
+   "posicion": "Front Desk Receptionist",
+   "puesto": "501",
+   "puesto_nombre": "AGENTE RECEPCION",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0111",
+   "posicion": "Property Manager",
+   "puesto": "594",
+   "puesto_nombre": "DIRECTOR DE OPERACIONES",
+   "revisar": true,
+   "nota": "Director de Operaciones (594) o Gerente (500), como en CWL"
+  },
+  {
+   "depto": "0113",
+   "posicion": "Housekeeper",
+   "puesto": "508",
+   "puesto_nombre": "CAMARERA (O)",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0113",
+   "posicion": "Housekeeping Supervisor",
+   "puesto": "511",
+   "puesto_nombre": "SUPERVISOR(A) DE AMA DE LLAVES",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0114",
+   "posicion": "Guest Experience",
+   "puesto": "515",
+   "puesto_nombre": "EXPERIENCE MANAGER",
+   "revisar": true,
+   "nota": "Experience Manager (515) o Guest Relation Manager (516)"
+  },
+  {
+   "depto": "0122",
+   "posicion": "Station Cook 1",
+   "puesto": "529",
+   "puesto_nombre": "COCINERO A",
+   "revisar": true,
+   "nota": "Por analogia: Station Cook 1 = Cocinero A, Station Cook 2 = Cocinero B"
+  },
+  {
+   "depto": "0122",
+   "posicion": "Station Cook 2",
+   "puesto": "530",
+   "puesto_nombre": "COCINERO B",
+   "revisar": true,
+   "nota": "Por analogia: Station Cook 1 = Cocinero A, Station Cook 2 = Cocinero B"
+  },
+  {
+   "depto": "0122",
+   "posicion": "Steward",
+   "puesto": "537",
+   "puesto_nombre": "STEWARD",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "F&B Server 1",
+   "puesto": "545",
+   "puesto_nombre": "SALONERO(A)",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "F&B Supervisor",
+   "puesto": "546",
+   "puesto_nombre": "CAPITAN DE SALONEROS",
+   "revisar": true,
+   "nota": "No hay supervisor en 0123: Capitan de Saloneros (546) o Gerente AyB (0121-521), como en CWL"
+  },
+  {
+   "depto": "0132",
+   "posicion": "SPA Therapist",
+   "puesto": "548",
+   "puesto_nombre": "TERAPEUTA",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0152",
+   "posicion": "Driver",
+   "puesto": "550",
+   "puesto_nombre": "JORNALERO/PEON",
+   "revisar": true,
+   "nota": "Integrity solo tiene Jornalero/Peon (550) y Supervisor (551) en Transporte"
+  },
+  {
+   "depto": "0161",
+   "posicion": "Laundry Attendant",
+   "puesto": "552",
+   "puesto_nombre": "AYUDANTE DE LAVANDERIA",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0181",
+   "posicion": "Director",
+   "puesto": "553",
+   "puesto_nombre": "DIRECTOR GENERAL",
+   "revisar": true,
+   "nota": "Director General (553) o Resident Manager (555)"
+  },
+  {
+   "depto": "0181",
+   "posicion": "General Manager",
+   "puesto": "554",
+   "puesto_nombre": "GERENTE GENERAL",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0182",
+   "posicion": "Income Auditor",
+   "puesto": "561",
+   "puesto_nombre": "AUDITOR DE INGRESOS",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0186",
+   "posicion": "Security Guard",
+   "puesto": "575",
+   "puesto_nombre": "OFICIAL DE SEGURIDAD",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0200",
+   "posicion": "Groundskeeper",
+   "puesto": "591",
+   "puesto_nombre": "JARDINERO",
+   "revisar": true,
+   "nota": "Jardinero (591); si cuida tambien piscinas, Piscinero (586)"
+  },
+  {
+   "depto": "0200",
+   "posicion": "Rooms Operator",
+   "puesto": "589",
+   "puesto_nombre": "TECNICO DE MANTENIMIENTO",
+   "revisar": true,
+   "nota": "Integrity no tiene operador de habitaciones: Tecnico de Mantenimiento (589) o Tecnico de Planta (590)"
+  },
+  {
+   "depto": "0230",
+   "posicion": "Encargado de IT",
+   "puesto": "577",
+   "puesto_nombre": "SOPORTE TI",
+   "revisar": false,
+   "nota": ""
+  }
+ ]
+}

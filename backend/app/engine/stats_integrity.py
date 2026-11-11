@@ -1,0 +1,467 @@
+# -*- coding: utf-8 -*-
+"""Estadísticas de Integrity (clase 9) al mes, sobre el catálogo homologado.
+
+**De dónde sale el dato: la contabilidad manda** (owner, 2026-11-10). No hay
+plantilla ni otra subida: las estadísticas se leen del Balance de Comprobación
+que ya se sube en la Auditoría del mayor y queda en `mayor_movimientos`. Cuando
+Integrity empiece a registrar la clase 9 (2027), aparecen acá solas.
+
+**El día se suma acá, y en ningún otro lado.** En Integrity el nivel 6 de la
+cuenta es el DÍA: lo pone la interfaz de Opera, igual que en el ingreso —
+`4320-0151-999-999-001-12-00` es la venta del día 12—. El owner no quiere
+manejar días (*«solo full month»*), así que la llave del mes es el código SIN
+el nivel 6 y el valor del mes es la suma de todos sus días. Las horas (998x) ya
+traen 00 en ese nivel: la misma regla les da su único valor.
+
+**El valor es débito − crédito.** Una estadística no es plata: Integrity la
+registra como un movimiento de la cuenta y la cantidad es su saldo del mes. Un
+reverso (crédito) la descuenta, que es lo que tiene que pasar.
+
+⚠️ **Esto no alimenta ningún total.** No lo lee el P&L, ni un escenario, ni el
+catálogo estadístico de FinPlan (`stat_accounts`): es la vista de lo que
+contabilidad registró, para revisarlo y medir productividad. Que el dato viva en
+una sola tabla —el mayor— es lo que evita tener dos verdades sobre el mismo
+número.
+
+Puro: no importa nada de la base. Lo usan la API y las pruebas.
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+from decimal import Decimal
+from functools import lru_cache
+from typing import Iterable
+
+CARPETA = pathlib.Path(__file__).resolve().parents[1] / "seed_data"
+
+#: Siete segmentos: 9000-0110-001-001-001-12-01.
+_CODIGO = re.compile(r"^\d{4}-\d{3,4}-\d{3}-\d{3}-\d{3}-\d{2}-\d{2}$")
+
+
+def clave_mensual(cuenta: str) -> str | None:
+    """El código sin el nivel 6 (el día). `None` si no es una cuenta de 7 niveles."""
+    c = (cuenta or "").strip()
+    if not _CODIGO.match(c):
+        return None
+    p = c.split("-")
+    return "-".join(p[:5] + p[6:])
+
+
+def dia(cuenta: str) -> str:
+    """El nivel 6 tal cual (el día, o 00 en las horas)."""
+    p = (cuenta or "").strip().split("-")
+    return p[5] if len(p) == 7 else ""
+
+
+@lru_cache(maxsize=8)
+def leer_catalogo(hotel_id: str) -> dict:
+    """El catálogo homologado de ESTE hotel. Vacío si el hotel no lo tiene.
+
+    Valida lo que, si fallara, haría que un valor caiga en la cuenta equivocada:
+    claves repetidas y claves que no tienen la forma de 6 niveles.
+    """
+    archivo = CARPETA / f"stats_integrity_{hotel_id}.json"
+    if not archivo.exists():
+        return {"hotel": hotel_id, "version": "", "grupos": {}, "cuentas": []}
+    datos = json.loads(archivo.read_text(encoding="utf-8"))
+    vistos: set[str] = set()
+    for c in datos["cuentas"]:
+        k = c["clave"]
+        if k in vistos:
+            raise ValueError(f"{k}: clave repetida en el catálogo de Integrity")
+        if len(k.split("-")) != 6 or not k.startswith("9"):
+            raise ValueError(f"{k}: la clave es el código de Integrity sin el día (6 niveles, clase 9)")
+        if clave_mensual(c["codigo"].replace("DD", "01")) != k:
+            raise ValueError(f"{c['codigo']}: su clave no es {k}")
+        vistos.add(k)
+    return datos
+
+
+def agregar(movimientos: Iterable[tuple]) -> dict:
+    """Suma los movimientos de clase 9 por (mes, clave).
+
+    `movimientos`: tuplas `(mes, cuenta, debito, credito)`. Devuelve
+    `{(mes, clave): {"valor": Decimal, "dias": set, "movimientos": int}}`.
+    Lo que no es una cuenta de 7 niveles se ignora: no es una estadística.
+    """
+    out: dict[tuple[int, str], dict] = {}
+    for mes, cuenta, debito, credito in movimientos:
+        k = clave_mensual(cuenta)
+        if k is None or not k.startswith("9"):
+            continue
+        a = out.setdefault((int(mes), k), {"valor": Decimal("0"), "dias": set(), "movimientos": 0})
+        a["valor"] += Decimal(str(debito or 0)) - Decimal(str(credito or 0))
+        a["dias"].add(dia(cuenta))
+        a["movimientos"] += 1
+    return out
+
+
+def armar_vista(catalogo: dict, agregado: dict, meses_cargados: Iterable[int]) -> dict:
+    """La respuesta de la pantalla: cada cuenta del catálogo con sus 12 meses, los
+    totales por grupo, y lo que Integrity registró y el catálogo no conoce.
+
+    ⚠️ Lo que no está en el catálogo NO se descarta: se devuelve aparte. Una
+    estadística registrada con un código que la homologación no previó es justo
+    lo que hay que ver — tirarla en silencio es como se pierden datos acá.
+    """
+    por_clave: dict[str, dict[int, Decimal]] = {}
+    for (mes, k), a in agregado.items():
+        por_clave.setdefault(k, {})[mes] = a["valor"]
+    conocidas = {c["clave"] for c in catalogo["cuentas"]}
+
+    cuentas = []
+    grupos: dict[str, dict] = {}
+    for c in catalogo["cuentas"]:
+        vals = por_clave.get(c["clave"], {})
+        meses = [float(vals[m]) if m in vals else None for m in range(1, 13)]
+        con_dato = any(v is not None for v in meses)
+        cuentas.append({**c, "meses": meses, "con_dato": con_dato,
+                        "total": float(sum(vals.values(), Decimal("0")))})
+        g = grupos.setdefault(c["grupo"], {"grupo": c["grupo"], "concepto": c["concepto"],
+                                           "unidad": c["unidad"], "cuentas": 0, "con_dato": 0,
+                                           "meses": [0.0] * 12})
+        g["cuentas"] += 1
+        g["con_dato"] += 1 if con_dato else 0
+        for i, v in enumerate(meses):
+            if v is not None:
+                g["meses"][i] += v
+
+    fuera = []
+    for k in sorted(set(por_clave) - conocidas):
+        vals = por_clave[k]
+        fuera.append({"clave": k, "grupo": k.split("-")[0], "depto": k.split("-")[1],
+                      "meses": [float(vals[m]) if m in vals else None for m in range(1, 13)],
+                      "total": float(sum(vals.values(), Decimal("0")))})
+
+    return {
+        "version_catalogo": catalogo.get("version", ""),
+        "meses_cargados": sorted(set(int(m) for m in meses_cargados)),
+        "grupos": sorted(grupos.values(), key=lambda g: g["grupo"]),
+        "cuentas": cuentas,
+        "fuera_de_catalogo": fuera,
+        "cuentas_con_dato": sum(1 for c in cuentas if c["con_dato"]),
+    }
+
+
+# ═══ El plan (Budget / Forecast) en la misma estructura ═══════════════════════
+#
+# Owner, 2026-11-10: «quiero mapear budget 2027 y forecast 2026 working separado
+# por rooms y villas» · «por ahora en budget me interesa tipo de habitación al
+# menos» · «available rooms per room type» · «occupied room per room type» · «las
+# estadísticas de spa, laundry».
+#
+# El plan no se arma acá: sale de lo que el sistema ya calcula (noches por tipo
+# del motor, Spa del ingreso, kilos de la config del reparto). Esto solo lo pone
+# al lado de lo que registra Integrity, con la misma llave: depto (0110 Rooms /
+# 0115 Villas / 0116 Residencias) × tipo de habitación (nivel 7).
+
+#: El rótulo de cada depto de habitaciones.
+DEPTOS_HAB = {"0110": "Rooms", "0115": "Villas", "0116": "Residencias"}
+
+#: Grupos de Integrity que son tratamientos (los 9210–9216 son fitness).
+GRUPOS_TRATAMIENTOS = {f"92{n:02d}" for n in range(1, 10)}
+
+#: Kilos: área → cuenta de Integrity. 9702 trae Spa, Huéspedes y Otros con el
+#: MISMO código (ver la lista de correcciones): hasta que contabilidad los
+#: separe, el real de esas tres áreas llega junto en 9702.
+KILOS_AREA = [("rooms", "9700", "Rooms (ropa de cama y toallas)"),
+              ("fb", "9701", "A&B"),
+              ("spa", "9702", "Spa"),
+              ("uniformes", "9702", "Uniformes"),
+              ("huespedes", "9702", "Huéspedes")]
+
+
+def real_por_tipo(agregado: dict, n7_a_codigo: dict[str, str]) -> dict:
+    """Noches ocupadas de Integrity (9000) por (depto, código de tipo) y mes,
+    sumando todos los segmentos. `n7_a_codigo`: '01' → 'BL01'."""
+    out: dict[tuple[str, str], list[float | None]] = {}
+    for (mes, k), a in agregado.items():
+        p = k.split("-")
+        if p[0] != "9000":
+            continue
+        codigo = n7_a_codigo.get(p[5], "") if p[5] != "00" else ""
+        # None = el mes no tiene movimiento: no es lo mismo que «cero noches».
+        fila = out.setdefault((p[1], codigo), [None] * 12)
+        fila[mes - 1] = (fila[mes - 1] or 0.0) + float(a["valor"])
+    return out
+
+
+def real_por_grupos(agregado: dict, grupos: set[str]) -> list[float | None]:
+    """La suma de los grupos de Integrity pedidos, por mes (None si no hay dato)."""
+    meses: list[float | None] = [None] * 12
+    for (mes, k), a in agregado.items():
+        if k.split("-")[0] in grupos:
+            meses[mes - 1] = (meses[mes - 1] or 0.0) + float(a["valor"])
+    return meses
+
+
+def real_horas_por_depto(agregado: dict, grupo: str = "9980") -> dict[str, list[float | None]]:
+    """Horas de Integrity de un grupo (9980 = regulares) por depto y mes, sumando
+    todas las posiciones del depto. La llave es la de planilla: 9980-DEPTO-POS-…"""
+    out: dict[str, list[float | None]] = {}
+    for (mes, k), a in agregado.items():
+        p = k.split("-")
+        if p[0] != grupo:
+            continue
+        fila = out.setdefault(p[1], [None] * 12)
+        fila[mes - 1] = (fila[mes - 1] or 0.0) + float(a["valor"])
+    return out
+
+
+def armar_horas(horas_plan: dict[str, list[float]], nombres: dict[str, str],
+                agregado_real: dict, horas_por_fte: list[float]) -> dict:
+    """Horas regulares del plan (días del mes × 8 × FTE, ver `engine/jornada.py`)
+    al lado de la 9980 de Integrity, por depto de planilla. Un depto que está en
+    uno solo de los dos lados igual aparece: es justo lo que hay que mirar.
+
+    `horas_por_fte`: las horas de un FTE completo en cada mes según el plan —la
+    9979 del escenario o, sin ella, días del mes × 8—. Con ellas sale el FTE del
+    plan, que devuelve lo cargado en la planilla.
+
+    El FTE real (el de Integrity) se divide por la 9979 que registre Integrity
+    ese mes; donde Integrity no la tenga, por la del plan. Así un mes en que
+    contabilidad cargó otra base se lee con SU base, no con la del presupuesto."""
+    real = real_horas_por_depto(agregado_real)
+    filas = []
+    for d in sorted(set(horas_plan) | set(real)):
+        plan = horas_plan.get(d) or [None] * 12
+        filas.append({"depto": d, "nombre": nombres.get(d, ""), "plan": plan,
+                      "real": real.get(d) or [None] * 12})
+    def suma(campo):
+        return [sum(f[campo][i] for f in filas if f[campo][i] is not None)
+                if any(f[campo][i] is not None for f in filas) else None for i in range(12)]
+    base_integrity = real_por_grupos(agregado_real, {"9979"})
+    base_real = [b or horas_por_fte[i] for i, b in enumerate(base_integrity)]
+
+    def fte(meses, base):
+        return [None if h is None or not base[i] else h / base[i] for i, h in enumerate(meses)]
+    for f in filas:
+        f["fte_plan"], f["fte_real"] = fte(f["plan"], horas_por_fte), fte(f["real"], base_real)
+    total = {"plan": suma("plan"), "real": suma("real")}
+    total["fte_plan"], total["fte_real"] = fte(total["plan"], horas_por_fte), fte(total["real"], base_real)
+    return {"deptos": filas, "total": total, "horas_por_fte": list(horas_por_fte),
+            "horas_por_fte_real": base_integrity}
+
+
+def armar_plan(tipos: list[dict], por_tipo: dict, total_sin_tipo: dict,
+               spa: list[float | None], kilos: dict[str, list[float]],
+               agregado_real: dict) -> dict:
+    """Arma la comparación Plan vs. Integrity.
+
+    `tipos`: [{"codigo","nombre","depto","n7","unidades"}] en el orden del inventario.
+    `por_tipo`: {(codigo, mes): {"disponibles","ocupadas","pax"}} del plan.
+    `total_sin_tipo`: {mes: {"disponibles","ocupadas"}} para los meses en que el
+        escenario no tiene la apertura por tipo (Forecast: los meses propios).
+    `spa`: tratamientos del plan por mes. `kilos`: {área: 12 meses}.
+    """
+    n7_a_codigo = {t["n7"]: t["codigo"] for t in tipos}
+    real = real_por_tipo(agregado_real, n7_a_codigo)
+
+    habitaciones = []
+    for dep, rotulo in DEPTOS_HAB.items():
+        filas = []
+        for t in (x for x in tipos if x["depto"] == dep):
+            disp = [por_tipo.get((t["codigo"], m), {}).get("disponibles") for m in range(1, 13)]
+            ocup = [por_tipo.get((t["codigo"], m), {}).get("ocupadas") for m in range(1, 13)]
+            pax = [por_tipo.get((t["codigo"], m), {}).get("pax") for m in range(1, 13)]
+            r = real.get((dep, t["codigo"]))
+            filas.append({
+                "codigo": t["codigo"], "nombre": t["nombre"], "n7": t["n7"], "unidades": t["unidades"],
+                "cuenta": f"9000-{dep}-SEG-N4-001-DD-{t['n7']}",
+                "disponibles": disp, "ocupadas": ocup, "pax": pax,
+                "ocupacion": [(o / d) if (d and o is not None) else None for o, d in zip(ocup, disp)],
+                "real_ocupadas": r if r is not None else [None] * 12,
+            })
+        # Un depto sin un solo dato —ni del plan ni de Integrity— no se muestra:
+        # pasa en 2024 y 2025, que no tienen apertura por tipo. Un depto con
+        # ceros (Residencias con 0 unidades) SÍ se muestra: el cero es un dato.
+        if not any(v is not None for f in filas
+                   for c in ("disponibles", "ocupadas", "real_ocupadas") for v in f[c]):
+            continue
+
+        def suma(campo):
+            return [sum(f[campo][i] for f in filas if f[campo][i] is not None)
+                    if any(f[campo][i] is not None for f in filas) else None for i in range(12)]
+        sd, so = suma("disponibles"), suma("ocupadas")
+        habitaciones.append({
+            "depto": dep, "rotulo": rotulo, "tipos": filas,
+            "total": {"disponibles": sd, "ocupadas": so, "pax": suma("pax"),
+                      "ocupacion": [(o / d) if (d and o is not None) else None for o, d in zip(so, sd)],
+                      "real_ocupadas": suma("real_ocupadas") if any(
+                          v is not None for f in filas for v in f["real_ocupadas"]) else [None] * 12},
+        })
+
+    sin_tipo = None
+    if total_sin_tipo:
+        sin_tipo = {
+            "disponibles": [total_sin_tipo.get(m, {}).get("disponibles") for m in range(1, 13)],
+            "ocupadas": [total_sin_tipo.get(m, {}).get("ocupadas") for m in range(1, 13)],
+        }
+
+    lav = []
+    for area, cuenta, rotulo in KILOS_AREA:
+        if area in kilos:
+            lav.append({"area": area, "rotulo": rotulo, "cuenta": cuenta, "plan": kilos[area]})
+    real_kilos = {c: real_por_grupos(agregado_real, {c}) for c in ("9700", "9701", "9702")}
+
+    return {
+        "habitaciones": habitaciones,
+        "sin_tipo": sin_tipo,
+        "spa": {"plan": spa, "real": real_por_grupos(agregado_real, GRUPOS_TRATAMIENTOS),
+                "cuentas": "9201–9209"},
+        "lavanderia": {"plan": lav, "real": real_kilos},
+    }
+
+
+# ─── El reporte de FTE por puesto (owner, 2026-11-10) ────────────────────────
+#
+# «Ocupo que me generes un reporte de FTE basado en las horas que se reportan en
+#  la planilla o en Budget» · «el FTE debe ser por position y las horas deben ser
+#  por position que viene de la contabilidad».
+#
+# Integrity registra las horas por PUESTO del catálogo (nivel 3 de la 9980:
+# 501 Agente Recepción), sumando a todas las personas del puesto. La planilla de
+# FinPlan tiene una fila por persona con códigos propios (0111-01). El puente es
+# `seed_data/puestos_integrity_<hotel>.json`; con él, cada puesto lleva:
+#   - el FTE de las posiciones de la planilla que caen en él, y sus horas
+#     (FTE × la base del mes: 9979 o días × 8);
+#   - las horas que registró contabilidad para ese puesto (9980-9986), y el set
+#     de FTE 9902-9905 que sale de ellas.
+
+HORAS_DEL_SET = ("9980", "9981", "9982", "9983", "9985", "9986")
+
+
+def _norm(nombre: str) -> str:
+    return " ".join((nombre or "").split()).upper()
+
+
+def leer_mapa_puestos(hotel_id: str) -> dict[tuple[str, str], dict]:
+    """{(depto, NOMBRE DE POSICIÓN): {"puesto","revisar","nota"}}."""
+    archivo = CARPETA / f"puestos_integrity_{hotel_id}.json"
+    if not archivo.exists():
+        return {}
+    datos = json.loads(archivo.read_text(encoding="utf-8"))
+    return {(m["depto"], _norm(m["posicion"])): m for m in datos["mapa"]}
+
+
+def nombres_de_puestos(catalogo: dict) -> dict[tuple[str, str], str]:
+    """{(depto, puesto): «AGENTE RECEPCION»} de las 9980 del catálogo homologado."""
+    out = {}
+    for c in catalogo["cuentas"]:
+        if c.get("grupo") == "9980":
+            n3 = c["clave"].split("-")[2]
+            out[(c["depto"], n3)] = (c.get("nivel3") or "").split(":", 1)[-1].strip()
+    return out
+
+
+def nombres_del_mapa(mapa: dict[tuple[str, str], dict]) -> dict[tuple[str, str], str]:
+    """{(depto, puesto): nombre} tal como lo escribe el mapa (`puesto_nombre`).
+
+    Oxygen, 2026-11-10: sin el export de estadísticas del hotel el catálogo
+    homologado está vacío y el reporte de FTE mostraría «501» a secas. El mapa
+    trae el nombre del puesto del catálogo del grupo; el del catálogo del hotel,
+    cuando exista, manda (ver `reporte_fte`).
+    """
+    out: dict[tuple[str, str], str] = {}
+    for (depto, _), m in mapa.items():
+        if m.get("puesto") and m.get("puesto_nombre"):
+            out.setdefault((depto, m["puesto"]), m["puesto_nombre"])
+    return out
+
+
+def horas_integrity_por_puesto(agregado: dict) -> dict[tuple[str, str], dict[str, list]]:
+    """{(depto, puesto): {cuenta: 12 meses}}. Suma clases y categorías (expat,
+    local, temporal) del mismo puesto: el reporte es por puesto."""
+    out: dict[tuple[str, str], dict[str, list]] = {}
+    for (mes, k), a in agregado.items():
+        p = k.split("-")
+        if p[0] not in HORAS_DEL_SET or len(p) < 3:
+            continue
+        fila = out.setdefault((p[1], p[2]), {}).setdefault(p[0], [None] * 12)
+        fila[mes - 1] = (fila[mes - 1] or 0.0) + float(a["valor"])
+    return out
+
+
+def _sumar(destino: list, origen: list) -> None:
+    for i, v in enumerate(origen):
+        if v is not None:
+            destino[i] = (destino[i] or 0.0) + v
+
+
+def armar_fte(posiciones: list[dict], nombres: dict[str, str], bases: list,
+              mapa: dict[tuple[str, str], dict], nombres_puesto: dict[tuple[str, str], str],
+              horas: dict[tuple[str, str], dict[str, list]]) -> dict:
+    """Arma el reporte por depto → puesto. Pura: la usan las pruebas sin base.
+
+    `posiciones`: [{"depto","codigo","nombre","empleado","fte": 12}] (sin «GL»).
+    `mapa`: de `leer_mapa_puestos`. `horas`: de `horas_integrity_por_puesto`.
+    """
+    from app.engine import jornada
+
+    def set_de(h: dict[str, list]) -> dict[str, list]:
+        out = {c: [None] * 12 for c in jornada.SET_FTE}
+        for i in range(12):
+            for c, v in jornada.calcular_set_fte({k: h.get(k, [None] * 12)[i] for k in HORAS_DEL_SET},
+                                                 bases[i]).items():
+                out[c][i] = None if v is None else float(v)
+        return out
+
+    def vacias():
+        return {c: [None] * 12 for c in HORAS_DEL_SET}
+
+    puestos: dict[tuple[str, str], dict] = {}
+    sin_puesto: dict[str, list] = {}
+    for p in posiciones:
+        m = mapa.get((p["depto"], _norm(p["nombre"])))
+        fila = {**p, "horas_plan": [float(bases[i]) * p["fte"][i] for i in range(12)],
+                "revisar": bool(m and m.get("revisar")), "nota": (m or {}).get("nota", ""),
+                "mapeada": m is not None}
+        if not m or not m.get("puesto"):
+            sin_puesto.setdefault(p["depto"], []).append(fila)
+            continue
+        k = (p["depto"], m["puesto"])
+        puestos.setdefault(k, {"posiciones": []})["posiciones"].append(fila)
+    for k in horas:                      # puestos con horas y sin nadie en la planilla
+        puestos.setdefault(k, {"posiciones": []})
+
+    deptos = sorted({k[0] for k in puestos} | set(sin_puesto))
+    filas = []
+    tot = {"fte_plan": [0.0] * 12, "horas": vacias()}
+    for d in deptos:
+        lista = []
+        dep = {"fte_plan": [0.0] * 12, "horas": vacias()}
+        for (dd, n3) in sorted(k for k in puestos if k[0] == d):
+            pos = puestos[(dd, n3)]["posiciones"]
+            fte = [sum(x["fte"][i] for x in pos) for i in range(12)]
+            h = horas.get((dd, n3), {})
+            hh = {c: list(h.get(c, [None] * 12)) for c in HORAS_DEL_SET}
+            lista.append({"puesto": n3, "nombre": nombres_puesto.get((dd, n3), ""), "posiciones": pos,
+                          "revisar": any(x["revisar"] for x in pos),
+                          "fte_plan": fte, "horas_plan": [float(bases[i]) * fte[i] for i in range(12)],
+                          "horas": hh, "set": set_de(hh)})
+            for i in range(12):
+                dep["fte_plan"][i] += fte[i]
+            for c in HORAS_DEL_SET:
+                _sumar(dep["horas"][c], hh[c])
+        sp = sin_puesto.get(d, [])
+        for i in range(12):
+            dep["fte_plan"][i] += sum(x["fte"][i] for x in sp)
+        if not any(dep["fte_plan"]) and all(v is None for c in dep["horas"].values() for v in c):
+            continue
+        for i in range(12):
+            tot["fte_plan"][i] += dep["fte_plan"][i]
+        for c in HORAS_DEL_SET:
+            _sumar(tot["horas"][c], dep["horas"][c])
+        filas.append({"depto": d, "nombre": nombres.get(d, ""), "puestos": lista, "sin_puesto": sp,
+                      "fte_plan": dep["fte_plan"],
+                      "horas_plan": [float(bases[i]) * dep["fte_plan"][i] for i in range(12)],
+                      "horas": dep["horas"], "set": set_de(dep["horas"])})
+    return {"deptos": filas, "base": [float(b) for b in bases],
+            "set_nombres": {c: n for c, (n, _) in jornada.SET_FTE.items()},
+            "set_formulas": {c: jornada.formula_de(c) for c in jornada.SET_FTE},
+            "hay_horas": any(v is not None for c in tot["horas"].values() for v in c),
+            "total": {"fte_plan": tot["fte_plan"],
+                      "horas_plan": [float(bases[i]) * tot["fte_plan"][i] for i in range(12)],
+                      "horas": tot["horas"], "set": set_de(tot["horas"])}}

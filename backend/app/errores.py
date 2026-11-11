@@ -206,6 +206,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "auditoria.sin_lineas": {
         "es": "El archivo no trae ninguna línea de asiento con cuenta de siete segmentos. ¿Es el Full Detail P&L de Integrity?",
         "en": "The file has no journal lines with a seven-segment account. Is it the Integrity Full Detail P&L?"},
+    "stats_integrity.anio_invalido": {
+        "es": "El año {anio} no es válido.",
+        "en": "Year {anio} is not valid."},
     "mayor.mes_invalido": {
         "es": "El mes tiene que estar entre 1 y 12.",
         "en": "The month must be between 1 and 12."},
