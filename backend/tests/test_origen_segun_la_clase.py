@@ -11,10 +11,22 @@ import importlib.util
 import json
 import pathlib
 
+from app.engine import gl_por_mes as g
+
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 MAPEO = json.loads((RAIZ / "app" / "seed_data" / "mapping_pl.json").read_text(encoding="utf-8"))
 
+CATEGORIA = {"4": {"REVENUE", "ALLOCATIONS"}, "5": {"COST_OF_SALES"}, "6": {"PAYROLL"},
+             "7": {"OPERATING_EXPENSES"}, "8": {"BELOW_GOP"}}
 ORIGEN = {"6": {"Payroll", "PAYROLL"}, "7": {"Opex", "OpEx", "Operating Expense"}}
+
+
+def test_cada_fila_cae_en_la_categoria_de_su_clase():
+    malas = [(x["source_department"], x["account_code"], x["report_section"])
+             for x in MAPEO["account_mapping"]
+             if g.categoria_de(str(x["account_code"]), x["report_section"])
+             not in CATEGORIA[str(x["account_code"])[0]]]
+    assert not malas, malas[:10]
 
 
 def test_ninguna_estadistica_esta_en_el_pl():

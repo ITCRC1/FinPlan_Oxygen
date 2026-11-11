@@ -16,8 +16,10 @@ afuera. Además sirve desde el primer hotel, no desde el segundo.
 escenario usado, y cada línea del P&L con sus 12 meses y el anual, en USD, más
 los KPIs. Si cambia, cambia en las cuatro — por eso hay prueba de su forma.
 
-**Qué NO sale por acá:** detalle de cuentas, planilla, nombres de personas,
-ninguna fila del GL. Totales por línea y nada más.
+**Qué NO sale por acá:** planilla por persona, nombres de personas, ningún
+asiento del mayor. Totales por línea y, en `/consolidado/gl/` (traído de CWL
+el 2026-11-10 para el Excel en vivo), el mayor por mes: una fila por
+(departamento × cuenta) con sus doce meses —sumas, nunca movimientos—.
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -139,4 +141,110 @@ async def consolidado_escenarios(quien: str = Depends(lector_del_consolidado)):
         "escenarios": [{
             "year": e.year, "tipo": e.type, "version": e.version, "status": e.status,
         } for e in filas],
+    }
+
+
+def _escoger_escenario(escenarios: list, tipo: str, version: str | None):
+    """El escenario a entregar. Sin versión: para FORECAST el marcado ★ Current
+    (o el más reciente si no hay marca); para ACTUAL el real, nunca un espejo
+    de Pre-Cierre (Oxygen no los tiene; se deja por paridad con CWL)."""
+    if version:
+        return next((e for e in escenarios if e.version == version), None)
+    if tipo == "ACTUAL":
+        escenarios = [e for e in escenarios if not getattr(e, "es_precierre", False)]
+    if tipo == "FORECAST":
+        marcado = [e for e in escenarios if getattr(e, "is_current_forecast", False)]
+        if marcado:
+            return marcado[0]
+    return escenarios[0] if escenarios else None
+
+
+@router.get("/consolidado/gl/")
+async def consolidado_gl(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    catalogo: bool = Query(False, description="Incluir en cero las cuentas del mapeo que el escenario no usó"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Las cuentas del mayor por mes, para un Excel que se actualiza solo.
+
+    Owner, 2026-11-10: *«necesito formatear esto para poder desde excel bajar
+    estos datos con refresh, con varias versiones»*.
+
+    ⚠️ **Reusa `gl_api._grilla`, el MISMO armado que el botón Excel de la
+    pantalla.** Una segunda lectura que "hace lo mismo" termina dando otra
+    cifra el día que una de las dos cambia, y la diferencia aparece en un
+    archivo que alguien ya mandó. Acá lo que baja Power Query es,
+    literalmente, lo que muestra el reporte.
+
+    Se resuelve por **año + tipo + versión**, no por UUID: en el Excel la
+    versión se escribe como se llama ("Working", "Final"), que es lo que el
+    usuario sabe. Sin versión manda el mismo criterio del resto del
+    consolidado -- el ★ Current del forecast, el ACTUAL real y nunca el espejo
+    del Pre-Cierre.
+
+    Una fila por (departamento × cuenta) con sus doce meses y el anual, y el
+    mismo signo del reporte: **el ingreso va NEGATIVO** (es crédito), así que
+    la suma de todas las filas es la utilidad cambiada de signo.
+    """
+    from app.api import gl_api
+
+    tipo = tipo.upper()
+    if tipo not in TIPOS:
+        raise ErrorApi(422, "consolidado.tipo_invalido", tipos=", ".join(TIPOS))
+
+    async with get_session() as session:
+        escenarios = (await session.execute(
+            select(Scenario).where(Scenario.hotel_id == HOTEL_ID, Scenario.year == year,
+                                   Scenario.type == tipo)
+            .order_by(Scenario.created_at.desc()))).scalars().all()
+        escenario = _escoger_escenario(list(escenarios), tipo, version)
+        if escenario is None:
+            if version:
+                raise ErrorApi(404, "consolidado.sin_escenario_version",
+                               propiedad=HOTEL_NAME, tipo=tipo, version=version, anio=year)
+            raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo=tipo, anio=year)
+
+        grilla, fuente, completo, _cmp, _sec, n_cat, n_vacias = await gl_api._grilla(
+            session, escenario, catalogo=catalogo)
+
+    return {
+        "contrato": CONTRATO,
+        "hotel_id": HOTEL_ID,
+        "hotel_name": HOTEL_NAME,
+        "year": year,
+        "tipo": tipo,
+        "escenario": {
+            "id": escenario.id, "version": escenario.version,
+            "status": escenario.status, "source_mode": escenario.source_mode,
+            "actuals_through": escenario.actuals_through or 0,
+        },
+        "fuente": fuente,
+        "completo": completo,
+        "cuentas_catalogo": n_cat,
+        "cuentas_sin_movimiento": n_vacias,
+        "signo": "revenue_credit",
+        "cuentas": [{
+            "dept": r["dept_code"], "dept_name": r["dept_name"],
+            "cuenta": r["account_code"], "nombre": r["account_name"],
+            "seccion": r["pl_section"], "linea": r["pl_line_code"],
+            "renglon": r["pl_line_name"], "categoria": r["categoria"],
+            "naturaleza": ("Revenue"
+                           if (r["pl_section"] or "").strip().upper() == "REVENUES"
+                           else "Expense"),
+            # La columna `Status` del mapeo. `_grilla` solo resuelve con reglas
+            # ACTIVAS, asi que una fila con renglon viene de una regla activa;
+            # una sin renglon es plata del mayor que el P&L no ve -- y eso es
+            # mas util saberlo que ver un "YES" en todas.
+            "estado": "YES" if r["pl_line_code"] else "SIN MAPEO",
+            # COMO la resolvio: exact · parent · dept-agnostic · FALLBACK · DROP.
+            # FALLBACK llega por descarte y puede moverse de renglon solo el dia
+            # que aparezca una segunda regla.
+            "mapeo": r["mapeo"],
+            "por_linea": bool(r.get("por_linea")),
+            "sin_movimiento": bool(r.get("sin_movimiento")),
+            "meses": [float(x or 0) for x in r["meses"]],
+            "anual": float(r["total"] or 0),
+        } for r in grilla],
     }

@@ -5842,3 +5842,119 @@ async function errorLegible(res: Response): Promise<Error> {
   } catch { /* no era JSON */ }
   return Object.assign(new Error(mensaje), { clave, detalle, status: res.status });
 }
+
+// ─── Cuentas del mayor por mes, y su conciliación contra el P&L ──────────────
+//
+// El reporte que el owner pidió el 2026-11-05 «para poder conciliar los
+// resultados». La convención de signo viaja en `meta.signo` y NO se decide
+// acá: el backend ya entrega los montos con el ingreso en negativo, para que
+// la grilla, el resumen, el Excel y la validación sumen lo mismo.
+
+export interface GlRow {
+  dept_code: string;
+  dept_name: string;
+  account_code: string;
+  account_name: string;
+  outlet: string;
+  clase: string;
+  pl_line_code: string;
+  pl_line_name: string;
+  pl_section: string;
+  /** 'exact' | 'parent' | 'dept-agnostic' | 'FALLBACK' | 'DROP' */
+  mapeo: string;
+  mapeo_cambio: boolean;
+  codigo_corporativo: string;
+  categoria: string;
+  clase_discrepa: boolean;
+  /** Viene del catálogo del mapeo y el escenario no la usó: toda en cero. */
+  sin_movimiento?: boolean;
+  /** El monto viene de la LÍNEA del P&L, puesto en su cuenta de asiento. */
+  por_linea?: boolean;
+  meses: number[];
+  total: number;
+}
+
+export interface GlResumenFila {
+  categoria: string;
+  /** Las estadísticas (9xxx) NO suman: son noches y kilos, no plata. */
+  suma: boolean;
+  meses: number[];
+  total: number;
+}
+
+export interface GlMeta {
+  scenario_id: string;
+  hotel_id: string;
+  year: number;
+  type: string;
+  version: string;
+  source_mode: string;
+  revenue_source: string;
+  actuals_through: number;
+  /** 'actual_entries' | 'checkbook' */
+  fuente: string;
+  /** false = la grilla NO lleva todo el ingreso que dice el P&L. */
+  completo: boolean;
+  /** Cuánto ingreso lleva la grilla, cuánto dice el P&L, y el hueco. */
+  ingreso_grilla: number;
+  ingreso_pl: number;
+  falta_ingreso: number;
+  cuentas: number;
+  /** Cuántas cuentas existen en el mapeo (Admin · Account Mapping). */
+  cuentas_catalogo: number;
+  /** De ésas, cuántas este escenario no tocó. */
+  cuentas_sin_movimiento: number;
+  /** Si la grilla las está mostrando en cero. */
+  catalogo: boolean;
+  filas: number;
+  signo: string;
+}
+
+export interface GlRespuesta {
+  meta: GlMeta;
+  rows: GlRow[];
+  resumen: GlResumenFila[];
+}
+
+export interface GlHallazgo {
+  dept_code: string;
+  account_code: string;
+  account_name: string;
+  total: number;
+  pl_line_code?: string;
+  pl_section?: string;
+}
+
+export interface GlValidacion {
+  /** null cuando la igualdad no aplica a este escenario. */
+  cuadra: boolean | null;
+  aplica_igualdad: boolean;
+  /** Clave de traducción: "" | "vacio" | "checkbook" | "mezcla". */
+  motivo: string;
+  /** El `actuals_through` del escenario, para el motivo "mezcla". */
+  motivo_mes: number;
+  total_reporte: number;
+  utilidad_pl: number;
+  esperado: number;
+  diferencia: number;
+  tolerancia: number;
+  sin_mapeo: GlHallazgo[];
+  sin_mapeo_total: number;
+  por_descarte: GlHallazgo[];
+  por_descarte_total: number;
+  clase_discrepa: GlHallazgo[];
+  clase_discrepa_total: number;
+  mapeo_cambio: GlHallazgo[];
+  por_linea: { pl_line_code: string; gl: number; pl: number; diferencia: number }[];
+  fuente: string;
+}
+
+export async function getGl(scenarioId: string,
+                            catalogo = false): Promise<GlRespuesta> {
+  return api.get(`/gl/${scenarioId}/${catalogo ? "?catalogo=1" : ""}`);
+}
+
+export async function getGlValidacion(scenarioId: string): Promise<GlValidacion> {
+  return api.get(`/gl/${scenarioId}/validacion/`);
+}
+
