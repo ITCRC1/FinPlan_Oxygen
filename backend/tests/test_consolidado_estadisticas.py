@@ -65,3 +65,16 @@ def test_trae_los_indicadores_que_pidio_el_owner():
     for k in ("units", "rooms_available", "rooms_occupied", "occupancy_pct",
               "adr", "adr_total", "revpar"):
         assert k in claves
+
+
+def test_sin_adr_guardado_el_mes_usa_la_regla_del_anio():
+    """Un ACTUAL no guarda ADR por mes: sin esto el mes daba 0 y el año no."""
+    k = {**KPIS, "adr": 0.0}
+    i = ca.indicadores_del_periodo(k, LINEAS, 31)
+    assert i["adr"] == 190000.0 / 465.0
+    assert i["revpar_rooms"] == i["adr"] * 0.5
+
+
+def test_las_unidades_del_anio_cuentan_solo_meses_con_habitaciones():
+    cuerpo = _cuerpo("consolidado_estadisticas")
+    assert "dias_con_hab" in cuerpo

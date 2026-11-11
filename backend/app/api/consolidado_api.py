@@ -288,11 +288,18 @@ def indicadores_del_periodo(kpis: dict, lineas, dias: int) -> dict[str, float]:
     disponibles (owner, 2026-09-08). Lo nuevo se deriva de esos:
     unidades = disponibles / días, ADR total = ingreso total / ocupadas y el
     RevPAR de habitaciones = ADR × ocupación.
+
+    ⚠️ Sin ADR en las estadísticas (un ACTUAL no lo guarda por mes) se usa la
+    MISMA regla que `pl_api._aggregate_selected` aplica al año: ingreso de
+    habitaciones / ocupadas. Sin eso el mes salía en 0 y el año no.
     """
     disp = float(kpis.get("rooms_available") or 0)
     ocup = float(kpis.get("rooms_occupied") or 0)
     occ = float(kpis.get("occupancy_pct") or 0)
     adr = float(kpis.get("adr") or 0)
+    rooms = _monto(lineas, "REV_ROOMS")
+    if not adr and ocup:
+        adr = rooms / ocup
     total = _monto(lineas, "TOTAL_REVENUES")
     return {
         "units": round(disp / dias, 2) if dias else 0.0,
@@ -301,7 +308,7 @@ def indicadores_del_periodo(kpis: dict, lineas, dias: int) -> dict[str, float]:
         "guests": float(kpis.get("guests") or 0),
         "occupancy_pct": occ,
         "adr": adr,
-        "rooms_revenue": _monto(lineas, "REV_ROOMS"),
+        "rooms_revenue": rooms,
         "total_revenue": total,
         "adr_total": (total / ocup) if ocup else 0.0,
         "revpar": float(kpis.get("revpar") or 0),
@@ -347,8 +354,12 @@ async def consolidado_estadisticas(
 
     por_mes = {m["month"]: indicadores_del_periodo(
         m["kpis"] or {}, m["lines"], calendar.monthrange(year, m["month"])[1]) for m in mensual}
-    del_anio = indicadores_del_periodo(anual.get("kpis") or {}, anual["lines"],
-                                       366 if calendar.isleap(year) else 365)
+    # Las unidades del año promedian solo los meses con habitaciones: un ACTUAL
+    # a mitad de año no tiene por qué «perder» habitaciones en los meses que aún
+    # no se cerraron.
+    dias_con_hab = sum(calendar.monthrange(year, m["month"])[1] for m in mensual
+                       if float((m["kpis"] or {}).get("rooms_available") or 0) > 0)
+    del_anio = indicadores_del_periodo(anual.get("kpis") or {}, anual["lines"], dias_con_hab)
     return {
         "contrato": CONTRATO,
         "hotel_id": HOTEL_ID,
