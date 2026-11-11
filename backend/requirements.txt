@@ -21,7 +21,7 @@ pandas==3.0.3
 openpyxl==3.1.5
 # Solo para pruebas: una base en memoria donde ensayar un guardado real sin
 # PostgreSQL. Ver `test_el_mayor_guardado`.
-aiosqlite>=0.20.0
+aiosqlite==0.22.1
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
