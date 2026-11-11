@@ -52,14 +52,13 @@ async def catalogo(_=Depends(get_current_user)):
         "nombre_en": c.nombre_en, "unidad": c.unidad,
         "dims": c.dims_permitidas() and sorted(c.dims_permitidas()) or [],
         "deptos": c.deptos_propios(), "agrega": c.agrega,
-        "legado": c.legado, "activa": c.activa,
+        "legado": c.legado, "activa": c.activa, "formula": c.formula or "",
     } for c in filas],
         # La regla de la jornada, para que la pantalla la muestre en vez de que
         # el owner tenga que acordarse.
         "jornada": {
-            "horas_mes": float(jornada.HORAS_MES),
+            # Las horas del mes salen del calendario: días del mes × 8.
             "horas_dia": float(jornada.HORAS_POR_DIA),
-            "dias_base": float(jornada.DIAS_BASE_MES),
             "cierran": list(jornada.CUENTAS_DE_LA_JORNADA),
             "por_encima": list(jornada.CUENTAS_SOBRE_LA_JORNADA),
         }}
@@ -365,7 +364,13 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
                    (await s.execute(select(StatAccount))).scalars()}
 
     # El control de la jornada: por posición y por mes, las tres cuentas que
-    # cierran tienen que dar 240. Ver `engine/jornada.py`.
+    # cierran tienen que dar días del mes × 8 × FTE. Ver `engine/jornada.py`.
+    # La base de cada mes: la 9979 cargada en el escenario o días del mes × 8.
+    cargadas: dict[int, Decimal] = {}
+    for f in filas:
+        if f.account_code == jornada.CUENTA_BASE:
+            cargadas[f.month] = cargadas.get(f.month, Decimal("0")) + Decimal(str(f.value))
+    bases = jornada.bases_del_anio(e.year, cargadas)
     por_pos: dict = {}
     for f in filas:
         if f.account_code in jornada.CUENTAS_DE_LA_JORNADA and f.position_code:
@@ -373,7 +378,7 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
             por_pos.setdefault(k, {})[f.account_code] = f.value
     descuadres = []
     for (dep, pos, mes), horas in sorted(por_pos.items()):
-        cierra, dif = jornada.cierra_la_jornada(horas)
+        cierra, dif = jornada.cierra_la_jornada(horas, e.year, mes, base=bases[mes - 1])
         if not cierra:
             descuadres.append({"dept_code": dep, "position_code": pos,
                                "month": mes, "diferencia": float(dif)})
@@ -391,4 +396,6 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
         # Se devuelve SIEMPRE, aunque esté vacío: una lista vacía dice «todo
         # cierra», que es información. Que no aparezca la sección no dice nada.
         "jornada_descuadres": descuadres,
+        # Las horas de 1 FTE de cada mes con que se controló: 9979 o días × 8.
+        "jornada_base": [float(b) for b in bases],
     }

@@ -821,10 +821,13 @@ export interface CuentaEstadistica {
   code: string; grupo: string; nombre_es: string; nombre_en: string;
   unidad: string; dims: string[]; deptos: string[]; agrega: string;
   legado: string; activa: boolean;
+  /** Con fórmula = cuenta CALCULADA (el set de FTE 9902–9905): no se carga. */
+  formula?: string;
 }
 export interface CatalogoEstadisticas {
   cuentas: CuentaEstadistica[];
-  jornada: { horas_mes: number; horas_dia: number; dias_base: number;
+  /** Las horas del mes son días del mes × `horas_dia` (owner 2026-11-10). */
+  jornada: { horas_dia: number;
              cierran: string[]; por_encima: string[] };
 }
 export interface EstadisticasValores {
@@ -836,6 +839,8 @@ export interface EstadisticasValores {
   /** Posiciones cuyas horas no cierran su mes. Vacio = todas cierran. */
   jornada_descuadres: { dept_code: string; position_code: string;
                         month: number; diferencia: number }[];
+  /** Las horas de 1 FTE de cada mes con que se controló: 9979 o días × 8. */
+  jornada_base?: number[];
 }
 export async function getCatalogoEstadisticas(): Promise<CatalogoEstadisticas> {
   return api.get("/estadisticas/catalogo/");
