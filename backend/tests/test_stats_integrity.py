@@ -460,3 +460,17 @@ def test_el_set_del_catalogo_es_el_del_motor():
 def test_las_calculadas_no_entran_en_la_plantilla():
     src = inspect.getsource(__import__("app.engine.estadisticas_grilla", fromlist=["x"]).construir)
     assert 'StatAccount.formula == ""' in src
+
+
+def test_el_catalogo_de_oxygen_carga_y_sus_noches_son_sus_cinco_tipos():
+    """2026-11-11: sale de `scripts/generar_stats_integrity.py` — lo del grupo
+    igual que CWL (el «STATS CWL 2027.xlsx» es el catálogo del grupo) y las
+    noches rehechas con los 5 tipos activos de Oxygen (N7 01-05)."""
+    cat = si.leer_catalogo("OXI")
+    assert cat["hotel"] == "OXI" and len(cat["grupos"]) == 44
+    noches = [c for c in cat["cuentas"] if c["grupo"] == "9000"]
+    assert {c["clave"][-2:] for c in noches} == {"00", "01", "02", "03", "04", "05"}
+    assert all(c["estado_finplan"] == "CREAR EN INTEGRITY" for c in noches)
+    homologado = si.nombres_de_puestos(cat)
+    for (depto, nombre), m in si.leer_mapa_puestos("OXI").items():
+        assert not m["puesto"] or (depto, m["puesto"]) in homologado, (depto, nombre)
