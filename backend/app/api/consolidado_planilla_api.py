@@ -139,6 +139,31 @@ def filas_opex(entradas, nombres_dept: dict[str, str]) -> list[dict]:
     return out
 
 
+def filas_costos(entradas, nombres_dept: dict[str, str]) -> list[dict]:
+    """El checkbook de costo de ventas (clase 5): depto × cuenta × mes, en USD.
+
+    Owner, 2026-11-11 (Ojochal): «mete tambien el checkbook de costos de
+    ventas». Los montos son los guardados —los que suma el P&L—: una línea con
+    driver ya viene recalculada (% del ingreso, por noche, por huésped…), y el
+    modo y el driver van en sus columnas para que se vea de dónde sale la cifra.
+    Una línea en colones trae el dólar derivado con el TC de cada mes, como el OPEX.
+    """
+    out = []
+    for e in entradas:
+        meses = [round(float(e.get_month(m) or 0), 2) for m in range(1, 13)]
+        out.append({
+            "dept": e.dept_code, "dept_name": nombres_dept.get(e.dept_code, ""),
+            "cuenta": e.account_code, "nombre": e.account_name or "",
+            "modo": e.calc_mode or "MANUAL", "driver": e.driver_type or "",
+            "tasa": float(e.driver_pct_or_rate or 0),
+            "linea_ingreso": e.revenue_line_ref or "",
+            "moneda": e.currency or "USD",
+            "meses": meses, "anual": round(sum(meses), 2),
+        })
+    out.sort(key=lambda r: (r["dept"], r["cuenta"]))
+    return out
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 async def _reporte_planilla(session, escenario: Scenario) -> dict:
@@ -202,3 +227,23 @@ async def consolidado_opex(
         nombres = dict((await session.execute(
             select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
     return {**_cabecera(escenario, tipo), "lineas": filas_opex(entradas, nombres)}
+
+
+@router.get("/consolidado/costos/")
+async def consolidado_costos(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Checkbook de costo de ventas (clase 5): departamento × cuenta × mes, en USD."""
+    from app.models.cost_entry import CostEntry
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with get_session() as session:
+        escenario = await _escenario(session, year, tipo, version)
+        entradas = (await session.execute(
+            select(CostEntry).where(CostEntry.scenario_id == escenario.id))).scalars().all()
+        nombres = dict((await session.execute(
+            select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
+    return {**_cabecera(escenario, tipo), "lineas": filas_costos(entradas, nombres)}
