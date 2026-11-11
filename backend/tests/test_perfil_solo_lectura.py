@@ -50,7 +50,10 @@ def test_todo_router_de_datos_lleva_la_guarda_completa():
     ]
     # Los públicos a propósito: login, el consolidado (tiene su propia llave)
     # y los que declaran su guarda aparte.
-    permitidos = ("auth_router", "consolidado_router")
+    # Los `consolidado_*` (Rooms, posiciones y checkbooks del Excel en vivo)
+    # usan la misma llave de solo lectura que el consolidado.
+    permitidos = ("auth_router", "consolidado_router", "consolidado_rooms_router",
+                  "consolidado_planilla_router")
     for ln in sin_guarda:
         assert any(p in ln for p in permitidos), (
             f"router montado sin _guard y no está en la lista de públicos: {ln}")

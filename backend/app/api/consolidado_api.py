@@ -16,8 +16,10 @@ afuera. Además sirve desde el primer hotel, no desde el segundo.
 escenario usado, y cada línea del P&L con sus 12 meses y el anual, en USD, más
 los KPIs. Si cambia, cambia en las cuatro — por eso hay prueba de su forma.
 
-**Qué NO sale por acá:** planilla por persona, nombres de personas, ningún
-asiento del mayor. Totales por línea y, en `/consolidado/gl/` (traído de CWL
+**Qué NO sale por acá:** ningún asiento del mayor. (Hasta el 2026-11-11 tampoco
+salían planilla por persona ni nombres; ese día el owner pidió posiciones con
+nombre y salario — ver `consolidado_planilla_api`.) Por acá: totales por
+línea y, en `/consolidado/gl/` (traído de CWL
 el 2026-11-10 para el Excel en vivo), el mayor por mes: una fila por
 (departamento × cuenta) con sus doce meses —sumas, nunca movimientos—.
 """
