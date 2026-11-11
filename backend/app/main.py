@@ -49,6 +49,7 @@ from app.api.canal_rooms_api import router as canal_rooms_router
 from app.api.rack_rooms_api import router as rack_rooms_router
 from app.api.ingreso_detalle_api import router as ingreso_detalle_router
 from app.api.estadisticas_api import router as estadisticas_router
+from app.api.auditoria_gl_api import router as auditoria_gl_router
 from app.api.checkbook_api import router as checkbook_router
 from app.api.canales_api import router as canales_router
 from app.api.semillas_api import router as semillas_router
@@ -209,6 +210,7 @@ app.include_router(canal_rooms_router, prefix="/api", dependencies=_guard)
 app.include_router(rack_rooms_router, prefix="/api", dependencies=_guard)
 app.include_router(ingreso_detalle_router, prefix="/api", dependencies=_guard)
 app.include_router(estadisticas_router, prefix="/api", dependencies=_guard)
+app.include_router(auditoria_gl_router, prefix="/api", dependencies=_guard)
 app.include_router(checkbook_router, prefix="/api", dependencies=_guard)
 app.include_router(canales_router, prefix="/api", dependencies=_guard)
 app.include_router(semillas_router, prefix="/api", dependencies=_guard)

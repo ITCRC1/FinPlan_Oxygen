@@ -203,7 +203,16 @@ def _rutas_de_subida() -> tuple[list[str], list[str]]:
 
 # ⚠️ `validate_upload` sólo VALIDA y no escribe. Registrarla haría que la
 # subida real después chocara contra su propia validación.
-NO_REGISTRAN = {"audit_api.py:validate_upload"}
+NO_REGISTRAN = {
+    "audit_api.py:validate_upload",
+    # La auditoria del mayor (traida de CWL) guarda el LIBRO del mes para
+    # mirarlo, pero no entra a ningun total ni a ningun escenario. Subir el
+    # mismo mes otra vez es justamente lo que se quiere, y el registro trae
+    # anti-reimport. Ver `auditoria_gl_api.py`.
+    "auditoria_gl_api.py:revisar",
+    "auditoria_gl_api.py:excel",
+    "auditoria_gl_api.py:_revisar",
+}
 
 
 def test_TODA_puerta_de_subida_QUE_ESCRIBE_registra_el_archivo():

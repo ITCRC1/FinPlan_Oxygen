@@ -36,6 +36,7 @@
     },
     "items": {
       "scenarios": "Scenarios (Budgets / Forecast)",
+      "auditoriaGl": "GL detail audit",
       "importActuals": "Upload Actuals / Forecast / Budget",
       "guillermoCola": "Guillermo",
       "command": "Command Center",

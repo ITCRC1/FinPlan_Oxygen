@@ -61,6 +61,10 @@ export const NAV: NavGroup[] = [
     key: "scenarios",
     items: [
       { key: "scenarios", href: "/scenarios" },
+      // La auditoría del mayor va antes de la carga: se revisa el detalle del
+      // mes y recién después se sube. El mes revisado queda guardado y es la
+      // fuente de la clase 9 real (Estadísticas → Stats).
+      { key: "auditoriaGl", href: "/pre-cierre/auditoria" },
       { key: "importActuals", href: "/admin/import-actuals" },
     ],
   },

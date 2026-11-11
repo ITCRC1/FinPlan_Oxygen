@@ -5731,3 +5731,114 @@ export async function subirPlantillaRack(
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json();
 }
+// ── Auditoría del detalle del mayor ──────────────────────────────────────────
+//
+// Owner, 2026-10-05: «que herramienta puedes hacerme para yo solo subir el
+// archivo en este detalle y me salgan automáticamente la auditoría con las
+// discrepancias». Se sube el Full Detail P&L de Integrity y vuelven los casos a
+// revisar. El mes queda guardado (`mayor_movimientos`): subir otra vez lo pisa.
+export interface AuditoriaLinea {
+  asiento: string; linea: string; fecha: string; cuenta: string;
+  descripcion: string; referencia: string; origen: string;
+  monto_crc: number; monto_usd: number;
+}
+export interface AuditoriaHallazgo {
+  /** Costos (5) · Planilla (6) · Opex (7) · Gastos de propiedad (8) ·
+   *  Ingresos (4). Sale de la cuenta SEÑALADA, no de la sugerida. */
+  grupo: string;
+  regla: string;
+  /** `alta` · `media` · `baja` — la tabla sale ordenada por esto y por monto. */
+  severidad: string;
+  cuenta: string; dept: string; concepto: string;
+  n_lineas: number; monto_crc: number; monto_usd: number;
+  porque: string;
+  /** La cuenta donde parece ir. Vacía cuando el reparto quedó partido al medio
+   *  y no hay un lado dominante: ahí hay que decidir, no mover. */
+  sugerencia: string;
+  lineas: AuditoriaLinea[];
+}
+export interface AuditoriaGL {
+  archivo: string; titulo: string; periodo: string; moneda: string;
+  hojas: string[];
+  lineas_del_archivo: number; lineas_revisadas: number; lineas_senaladas: number;
+  monto_en_revision_crc: number;
+  por_regla: Record<string, number>;
+  por_severidad: Record<string, number>;
+  /** Por tipo de cuenta, en el orden en que se revisa. Un tipo sin hallazgos NO
+   *  viene: una pestaña vacía se lee como «no revisé esto». */
+  por_grupo: Record<string, { casos: number; lineas: number; monto_crc: number; alta: number }>;
+  que_mira: Record<string, string>;
+  hallazgos: AuditoriaHallazgo[];
+}
+
+/** Un mes del mayor que ya quedo guardado. */
+export interface MesGuardado {
+  anio: number; mes: number; movimientos: number;
+  archivo: string | null; subido_en: string | null;
+}
+
+/** Que meses del mayor estan guardados, del mas nuevo al mas viejo. */
+export async function mesesDelMayor(): Promise<{ meses: MesGuardado[] }> {
+  return api.get(`/mayor/meses/`);
+}
+
+/**
+ * Los hallazgos de un mes YA SUBIDO, recalculados del mayor guardado.
+ *
+ * Owner, 2026-10-07: *«que el analisis no desaparezca… veo que todo desaparece
+ * una vez que uno sale y entra otra vez»*.
+ *
+ * ⚠️ Devuelve `hay: false` cuando el mes no esta subido, en vez de un cuadro
+ * vacio: «no subido» y «sin hallazgos» son dos cosas distintas.
+ */
+export async function auditoriaGuardada(
+  anio: number, mes: number,
+): Promise<AuditoriaGL & { hay: boolean; motivo?: string; de_lo_guardado?: boolean;
+                           subido_en?: string | null; subido_por?: string }> {
+  return api.get(`/auditoria-gl/${anio}/${mes}/`);
+}
+
+export async function auditarMayor(file: File): Promise<AuditoriaGL> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/auditoria-gl/revisar/`,
+    { method: "POST", body: fd, headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+/** El mismo análisis como hoja de trabajo. Va por POST porque lleva el archivo,
+ *  así que no puede usar `bajarArchivo`, que es GET. */
+export async function auditarMayorExcel(file: File): Promise<void> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/auditoria-gl/excel/`,
+    { method: "POST", body: fd, headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const cd = res.headers.get("content-disposition") || "";
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  a.download = m ? decodeURIComponent(m[1]) : "auditoria.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** El error del servidor, legible: el `detail` en el idioma de la pantalla y
+ *  la clave aparte. Traído de CWL junto con la auditoría del mayor. */
+async function errorLegible(res: Response): Promise<Error> {
+  const texto = await res.text();
+  let mensaje = texto, clave: string | undefined, detalle: unknown;
+  try {
+    const j = JSON.parse(texto);
+    clave = j?.clave;
+    detalle = j?.detail;
+    mensaje = typeof j?.detail === "string" ? j.detail
+            : (j?.detail?.mensaje ?? j?.detail?.error ?? texto);
+  } catch { /* no era JSON */ }
+  return Object.assign(new Error(mensaje), { clave, detalle, status: res.status });
+}

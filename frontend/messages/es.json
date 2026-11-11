@@ -36,6 +36,7 @@
     },
     "items": {
       "scenarios": "Escenarios (Budgets / Forecast)",
+      "auditoriaGl": "Auditoría del mayor",
       "importActuals": "Subir Actuales / Forecast / Budget",
       "guillermoCola": "Guillermo",
       "command": "Command Center",
