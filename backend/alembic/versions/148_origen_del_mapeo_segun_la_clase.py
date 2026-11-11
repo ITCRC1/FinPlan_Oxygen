@@ -131,10 +131,18 @@ CAMBIOS = [
     ('P&L_DETAIL_OWNERS', 'Departamento de Área Recreativa', '7185', 'Cost', 'Opex'),
 ]
 
+#: ⚠️ El NOT EXISTS: si la base ya tuviera la regla con el rótulo nuevo (no
+#: debería; no se pudo leer la base de Oxygen al escribir esto), se deja la
+#: vieja quieta antes que crear dos reglas con la misma llave. La unicidad de la
+#: tabla no lo atajaría: `vigente_desde` es NULL y en PostgreSQL dos NULL no
+#: chocan.
 _SQL = sa.text(
     "UPDATE account_mapping SET source_origin = :nuevo "
     "WHERE report_id = :rep AND source_department = :dep AND account_code = :cta "
-    "AND source_origin = :viejo AND vigente_desde IS NULL")
+    "AND source_origin = :viejo AND vigente_desde IS NULL "
+    "AND NOT EXISTS (SELECT 1 FROM account_mapping o WHERE o.report_id = :rep "
+    "AND o.source_department = :dep AND o.account_code = :cta "
+    "AND o.source_origin = :nuevo AND o.vigente_desde IS NULL)")
 
 
 def upgrade() -> None:
