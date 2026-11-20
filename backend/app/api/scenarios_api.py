@@ -769,9 +769,17 @@ async def pl_by_dept(
 ):
     """P&L por DEPARTAMENTO (grupos USALI) para el período (Full Year / YTD / mes).
     Por grupo: Revenue · Payroll · Gastos Operativos (OpEx 7xxx + Cost 5xxx) ·
-    Total de gastos · GOP del depto. Regla de allocation: Cafetería (0220) se
-    excluye completa; Laundry interno (0161) excluye payroll/opex (su Laundry
-    Services 4/5 queda). La suma de los GOP por depto = GOP total. Debajo del GOP
+    Total de gastos · GOP del depto.
+
+    Regla de allocation (desde el 2026-08-27; antes se excluía el departamento
+    entero y eso BORRABA el gasto en vez de moverlo): al origen —Cafetería 0220
+    y Lavandería 0161— se le RESTA lo que efectivamente repartió, y al destino
+    se le SUMA lo que recibió. Sin repartos la resta es cero y el gasto sale
+    completo; con un reparto total el residuo es cero y la fila desaparece
+    sola; si sobra, el sobrante se ve en overhead.
+
+    La suma de los GOP por depto = GOP total. Verificado contra producción el
+    2026-11-20: $1.074.303,40 en el Budget 2027 de Oxygen, igual al P&L oficial. Debajo del GOP
     (company-level, del P&L oficial): Rent+Fees+Insurance+Other = Total Non-Op →
     EBITDA Before Capital → −Capital −Financial −Depreciation → EBT → Income Taxes
     → Net Profit."""
