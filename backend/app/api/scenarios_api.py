@@ -781,9 +781,8 @@ async def pl_by_dept(
         group_for_dept, GROUP_NAMES, OPERATING_GROUP_ORDER, OVERHEAD_GROUP_ORDER,
         get_line,
     )
-    from app.importers.gl_detail_importer import (
-        ALLOC_EXCL_PAYROLL, ALLOC_EXCL_OPEX, ALLOC_EXCL_COST,
-    )
+    # (Ya no se importan `ALLOC_EXCL_*`: la resta la manda `allocation_entries`,
+    # que dice lo que se repartió de verdad, no la declaración de quién debería.)
 
     scen = await db.get(Scenario, scenario_id)
     if not scen:
@@ -875,9 +874,16 @@ async def pl_by_dept(
     # Se mira POR MES: un reparto de junio no puede achicar el gasto de enero.
     alloc_rows = (await db.execute(
         select(AllocationEntry).where(AllocationEntry.scenario_id == scenario_id))).scalars().all()
-    _CLASE_A_CAMPO = {"5": ("cost", ALLOC_EXCL_COST),
-                      "6": ("payroll", ALLOC_EXCL_PAYROLL),
-                      "7": ("opex", ALLOC_EXCL_OPEX)}
+    # ⚠️ Solo clase -> columna. SIN la lista de quien declara repartir.
+    #
+    # Antes la resta estaba condicionada a `DEPTOS_DE_REPARTO`, que declara
+    # `{"0161": {"6","7"}}` — sin la clase 5. Pero el motor SI reparte el 5301
+    # de lavanderia: medido en el Budget 2027 de Oxygen el 2026-11-20, $601,53
+    # salian de 0161 y llegaban al destino sin que a 0161 se le restara nada.
+    # La declaracion dice quien DEBERIA repartir; las filas de `allocation_entries`
+    # dicen quien repartio. Para restar manda lo segundo, que es la plata que
+    # efectivamente se movio.
+    _CLASE_A_CAMPO = {"5": "cost", "6": "payroll", "7": "opex"}
     repartido: dict[tuple[str, str], float] = {}
     for e in alloc_rows:
         if e.month not in months:
@@ -906,9 +912,8 @@ async def pl_by_dept(
     # La resta va DESPUES de acumular: el residuo es «lo que tenia menos lo que
     # repartio», y para eso el gasto ya tiene que estar sumado.
     for (origen, clase), monto in repartido.items():
-        campo, deptos_que_reparten = _CLASE_A_CAMPO[clase]
-        if origen in deptos_que_reparten and monto:
-            acc(group_for_dept(origen))[campo] -= monto
+        if monto:
+            acc(group_for_dept(origen))[_CLASE_A_CAMPO[clase]] -= monto
 
     # Repartos (cafetería 0220 y lavandería 0161). Los deptos origen se excluyen
     # arriba de payroll/opex/cost justamente porque su gasto se reparte acá: sin
@@ -1000,7 +1005,22 @@ async def pl_by_dept(
         # aparte, en su propio campo, para quien quiera cuadrar contra OPEX_x
         # del P&L oficial (que sí los trae dentro).
         operating = d["opex"] + d["cost"]
-        total_exp = d["payroll"] + operating
+        # ⚠️ El reparto SUMA. Es gasto de este departamento: planilla, gasto
+        # operativo o costo que se movio de otro, y por eso se le resto al
+        # origen. Dejarlo afuera restaba en una punta sin sumar en la otra, y
+        # el GOP por departamento salia ARRIBA del oficial por el monto
+        # repartido: $1.113.767,01 contra $1.074.303,40 en el Budget 2027 de
+        # Oxygen, $39.463,61 de diferencia.
+        #
+        # El contrato esta en CLAUDE.md: la suma de los GOP por depto = GOP
+        # total. El importador lo dice igual: «el motor suma planilla + costo +
+        # opex + REPARTO por grupo». Este reporte no sumaba el reparto.
+        #
+        # Y no fallaba nada: cada fila cuadraba consigo misma y el neto de los
+        # repartos seguia dando cero. Mientras 0161 estuvo en cero la
+        # diferencia era cero; el defecto esperaba a que el departamento
+        # tuviera gasto.
+        total_exp = d["payroll"] + operating + d["alloc"]
         gop = d["revenue"] - total_exp
         if abs(d["revenue"]) + abs(total_exp) < 0.005:
             continue

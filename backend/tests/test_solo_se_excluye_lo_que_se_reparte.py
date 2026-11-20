@@ -53,10 +53,8 @@ def test_se_resta_lo_repartido_por_clase():
     """6025 es planilla, 7310/7685 opex y 5301 costo: restar todo de una sola
     columna dejaría una en negativo y otra intacta."""
     fuente = _fuente()
-    assert '_CLASE_A_CAMPO = {"5": ("cost", ALLOC_EXCL_COST),' in fuente
-    assert '"6": ("payroll", ALLOC_EXCL_PAYROLL)' in fuente
-    assert '"7": ("opex", ALLOC_EXCL_OPEX)' in fuente
-    assert "[campo] -= monto" in fuente, "no se resta lo repartido"
+    assert '_CLASE_A_CAMPO = {"5": "cost", "6": "payroll", "7": "opex"}' in fuente
+    assert "-= monto" in fuente, "no se resta lo repartido"
 
 
 def test_la_resta_va_despues_de_acumular():
@@ -64,14 +62,45 @@ def test_la_resta_va_despues_de_acumular():
     gasto se sumaría después y la resta no habría servido de nada."""
     fuente = _fuente()
     assert fuente.index('["payroll"] += float(total_entry(e))') < \
-        fuente.index("[campo] -= monto")
+        fuente.index("_CLASE_A_CAMPO[clase]] -= monto")
 
 
-def test_la_resta_solo_toca_a_los_departamentos_que_reparten():
-    """Un reparto cuyo origen no está en la lista no puede achicar a nadie: sería
-    una resta contra un departamento que nunca fue de allocation."""
+def test_la_resta_la_manda_el_reparto_y_no_la_declaracion():
+    """Se le resta a quien REPARTIÓ, no a quien está declarado que reparte.
+
+    Hasta el 2026-11-20 la resta exigía que el origen estuviera en
+    `DEPTOS_DE_REPARTO`, que declara `{"0161": {"6","7"}}` — sin la clase 5. Y
+    el motor sí reparte el 5301 de lavandería: en el Budget 2027 de Oxygen
+    $601,53 salían de 0161 y llegaban al destino sin que a 0161 se le restara
+    nada, así que ese gasto quedaba contado dos veces.
+
+    Las filas de `allocation_entries` son el registro de la plata que se movió;
+    la declaración es una intención. Para restar manda el registro.
+    """
     fuente = _fuente()
-    assert "if origen in deptos_que_reparten and monto:" in fuente
+    assert "deptos_que_reparten" not in fuente, (
+        "volvió a condicionar la resta a la declaración")
+    # Los nombres aparecen en los comentarios —que cuentan esta historia—, así
+    # que no alcanza con buscarlos: lo que no puede volver es que DECIDAN.
+    for const in ("ALLOC_EXCL_COST", "ALLOC_EXCL_PAYROLL", "ALLOC_EXCL_OPEX"):
+        assert f"in {const}" not in fuente, f"{const} volvió a condicionar"
+        assert f"{const})" not in fuente, f"{const} volvió a usarse"
+    assert "if monto:" in fuente, "la resta tiene que ser incondicional"
+
+
+def test_el_reparto_que_llega_es_gasto_del_que_lo_recibe():
+    """`total_exp` tiene que incluir `alloc`. Si no, se resta en una punta y no
+    se suma en la otra.
+
+    Medido en el Budget 2027 de Oxygen el 2026-11-20: el GOP por departamento
+    daba $1.113.767,01 contra los $1.074.303,40 del P&L oficial —$39.463,61
+    arriba, exactamente lo repartido que sí se restaba al origen—. Nada fallaba:
+    cada fila cuadraba consigo misma y el neto de los repartos seguía dando
+    cero. Mientras 0161 estuvo en cero la diferencia era cero.
+    """
+    fuente = _fuente()
+    assert 'total_exp = d["payroll"] + operating + d["alloc"]' in fuente, (
+        "el reparto que llega volvió a quedarse fuera del gasto")
 
 
 def test_la_4999_no_se_resta():
@@ -124,8 +153,18 @@ def test_la_cafeteria_sigue_la_misma_regla():
 def test_la_lavanderia_no_reparte_su_costo_de_ventas():
     """0161 es SPLIT: la lavandería interna (6xxx y 7xxx) se reparte, pero el
     Laundry Services que se le vende al huésped es OPERATIVO y su costo se queda
-    con su ingreso. Por eso 0161 no está en `ALLOC_EXCL_COST`, y restarle clase
-    5 le quitaría un costo que nunca repartió."""
+    con su ingreso. Por eso 0161 no está en `ALLOC_EXCL_COST`.
+
+    ⚠️ **La declaración y el motor no coinciden, y gana el motor.** Medido en
+    producción el 2026-11-20, el Budget 2027 de Oxygen tiene una fila de reparto
+    con origen 0161 y cuenta 5301 por $601,53: el motor SÍ repartió clase 5 de
+    lavandería, contra lo que dice esta regla. Mientras el P&L por Departamento
+    se guiaba por la declaración, ese costo se restaba en ninguna parte y se
+    contaba dos veces.
+
+    El reporte ahora sigue las filas de `allocation_entries` —la plata que se
+    movió— y no esta lista. Queda pendiente decidir lo otro: si la regla es la
+    correcta, el que tiene que dejar de repartir clase 5 es el motor."""
     assert "0161" in ALLOC_EXCL_PAYROLL
     assert "0161" in ALLOC_EXCL_OPEX
     assert "0161" not in ALLOC_EXCL_COST
