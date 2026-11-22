@@ -188,6 +188,8 @@ export default function PayrollCheckbookPage() {
     finally { setBusy(null); }
   }
   const [busy, setBusy] = useState<string | null>(null);
+  // Filtro de Categoria para bajar el Excel ("" = todas)
+  const [excelCat, setExcelCat] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
   const [addModal, setAddModal] = useState(false);
 
@@ -198,17 +200,18 @@ export default function PayrollCheckbookPage() {
     if (!scenarioId) return;
     setBusy("download");
     try {
-      const blob = await downloadPayrollExcel(scenarioId);
+      const blob = await downloadPayrollExcel(scenarioId, excelCat);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `Planilla_${hotelSlug()}.xlsx`;
+      const sufijo = excelCat ? `_${excelCat.replace(/,/g, "_")}` : "";
+      a.href = url; a.download = `Planilla_${hotelSlug()}${sufijo}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       flash(t("excelDownloaded"));
     } catch (e) {
       flash(e instanceof Error ? e.message : t("errorDownloading"));
     } finally { setBusy(null); }
-  }, [scenarioId]);
+  }, [scenarioId, excelCat]);
 
   // Los 17 conceptos YA CALCULADOS, un tab por departamento. Es un REPORTE:
   // no se vuelve a subir. El de subir es «⬇ Excel», que trae posiciones y FTE.
@@ -388,6 +391,17 @@ export default function PayrollCheckbookPage() {
               border: "1px solid var(--border-medium)", fontWeight: 600 }}>
             {busy === "conceptos" ? t("downloading") : "↓ Conceptos x depto"}
           </button>
+          <select value={excelCat} onChange={e => setExcelCat(e.target.value)} disabled={!!busy}
+            title={t("excelCatHint")}
+            style={{ padding: "5px 8px", fontSize: 12, borderRadius: 4, cursor: "pointer",
+              background: "var(--bg-input)", color: "var(--text-primary)",
+              border: "1px solid var(--border-medium)" }}>
+            <option value="">{t("excelCatAll")}</option>
+            <option value="Operaciones">{t("excelCatOps")}</option>
+            <option value="Administrativo,Gerencial">{t("excelCatAdminGer")}</option>
+            <option value="Administrativo">{t("excelCatAdmin")}</option>
+            <option value="Gerencial">{t("excelCatGer")}</option>
+          </select>
           <button onClick={handleDownload} disabled={!!busy}
             style={{ padding: "5px 12px", fontSize: 12, borderRadius: 4, cursor: "pointer",
               background: "var(--accent-excel)", color: "#fff", border: "none", fontWeight: 600 }}>
