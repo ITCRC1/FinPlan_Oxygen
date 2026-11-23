@@ -1386,6 +1386,7 @@
     "errorUploading": "Error while uploading",
     "excelCatAll": "All categories",
     "excelCatOps": "Operations only",
+    "excelCatOpsGer": "Operations + Management",
     "excelCatAdminGer": "Administrative + Management",
     "excelCatAdmin": "Administrative only",
     "excelCatGer": "Management only",
