@@ -297,6 +297,11 @@ def consolidate_dept(dept_code: str) -> str:
     return _CONSOLIDATION.get((dept_code or "").strip(), dept_code)
 
 
+#: Cuentas sin regla propia en cada depto que se rutean como otra. Owner,
+#: 2026-11-22: Contract Labour (6031) «agrupa en Salaries» en todos los deptos.
+CUENTA_ALIAS: dict[str, str] = {"6031": "6000"}
+
+
 def construir_resolvedor(mappings: list[dict]):
     """Arma la búsqueda (departamento, cuenta) → regla de mapeo.
 
@@ -369,6 +374,15 @@ def construir_resolvedor(mappings: list[dict]):
         m = lookup_exact.get(("", cuenta))
         if m:
             return m, "dept-agnostic"
+        # Una cuenta que va donde va otra (6031 Contract Labour → donde va 6000
+        # Salarios del MISMO depto). Va antes del FALLBACK a propósito: la 6031
+        # tiene una sola regla (Tours), y por descarte todo el contract labour
+        # del hotel habría caído en Tours sin dar error.
+        alias = CUENTA_ALIAS.get(cuenta)
+        if alias:
+            m, como = resolve(dept, alias)
+            if m:
+                return m, como
         m = lookup_by_acct.get(cuenta)
         if m:
             return m, "FALLBACK"

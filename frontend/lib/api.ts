@@ -1378,6 +1378,7 @@ export interface ConceptEntry {
   c6022_occ_hazard: number; c6023_vacation_prov: number;
   c6025_cafeteria: number; c6026_severance: number;
   c6028_housing: number; c6029_transport: number; c6030_other: number;
+  c6031_contract_labour?: number;
   total: number;
 }
 
@@ -1386,6 +1387,8 @@ export interface Position {
   position_code: string; position_name: string;
   employee_name: string; employee_type: string;
   salary_amount: number; salary_currency: string;
+  /** Contract Labour: su salario va a 6031 y no genera cargas. */
+  contract_labour?: boolean;
   months: { month: number; fte: number; entry: ConceptEntry | null }[];
 }
 
@@ -1399,7 +1402,7 @@ export interface DeptSummaryMonth {
   c6010: number; c6024: number; c6027: number; base: number;
   c6020: number; c6021: number; c6004: number; c6022: number;
   c6023: number; c6025: number; c6026: number; c6028: number;
-  c6029: number; c6030: number; total: number;
+  c6029: number; c6030: number; c6031?: number; total: number;
 }
 
 export interface FteReportRow {
@@ -1511,7 +1514,7 @@ export async function uploadPayrollExcel(scenarioId: string, file: File) {
 export async function addPositions(scenarioId: string, body: {
   dept_code: string; dept_name?: string; position_name: string;
   position_code?: string; count: number;
-  salary_amount?: number; salary_currency?: string;
+  salary_amount?: number; salary_currency?: string; contract_labour?: boolean;
 }) {
   return api.post<{ created: number; codes: string[]; ids: string[] }>(
     `/payroll/${scenarioId}/positions/add/`, body);
@@ -1632,7 +1635,7 @@ export async function deletePosition(scenarioId: string, positionId: string) {
 export async function updatePosition(
   scenarioId: string, positionId: string,
   fields: Partial<{ position_name: string; employee_name: string;
-    salary_amount: number; salary_currency: string }>,
+    salary_amount: number; salary_currency: string; contract_labour: boolean }>,
 ) {
   return api.put<{ id: string; updated: boolean }>(
     `/payroll/${scenarioId}/position/${positionId}/`, fields);

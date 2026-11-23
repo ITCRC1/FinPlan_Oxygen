@@ -135,7 +135,12 @@ def test_base_va_despues_de_sus_componentes_y_total_al_final():
     # Los siete que la componen van antes; CCSS y aguinaldo, que se calculan
     # SOBRE la base, van después. Al revés el archivo se leería como si la CCSS
     # entrara en la base.
-    assert claves[:i] == ["c6000", "c6001", "c6002", "c6003", "c6010", "c6024", "c6027"]
+    # Contract Labour (6031) va pegada a la 6000, como en la pantalla (owner,
+    # 2026-11-22: «agrupa en Salaries»), pero NO es de la BASE: su driver lo dice.
+    assert claves[:i] == ["c6000", "c6031", "c6001", "c6002", "c6003", "c6010",
+                          "c6024", "c6027"]
+    assert [c for c in claves[:i] if c != "c6031"] == [
+        "c6000", "c6001", "c6002", "c6003", "c6010", "c6024", "c6027"]
     assert claves[i + 1] == "c6020"
 
 
