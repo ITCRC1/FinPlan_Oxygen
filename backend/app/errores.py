@@ -286,6 +286,21 @@ MENSAJES: dict[str, dict[str, str]] = {
     "auth.solo_lectura": {
         "es": "Tu perfil ({perfil}) es de sólo lectura: podés ver todo, pero no modificar.",
         "en": "Your profile ({perfil}) is read-only: you can see everything, but not change it."},
+    "libro.no_existe": {
+        "es": "Ese libro no existe",
+        "en": "That workbook does not exist"},
+    "libro.sin_anterior": {
+        "es": "Ese libro no tiene versión anterior",
+        "en": "That workbook has no previous version"},
+    "libro.sin_titulo": {
+        "es": "Ponele un nombre al libro",
+        "en": "Give the workbook a name"},
+    "libro.no_es_excel": {
+        "es": "El archivo no es un Excel (.xlsx o .xlsm)",
+        "en": "The file is not an Excel workbook (.xlsx or .xlsm)"},
+    "libro.muy_grande": {
+        "es": "El archivo pasa de 40 MB",
+        "en": "The file is larger than 40 MB"},
     "auth.requiere_admin": {
         "es": "Requiere rol admin",
         "en": "Requires the admin role"},

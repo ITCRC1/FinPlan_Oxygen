@@ -209,6 +209,10 @@ NO_REGISTRAN = {
     # mirarlo, pero no entra a ningun total ni a ningun escenario. Subir el
     # mismo mes otra vez es justamente lo que se quiere, y el registro trae
     # anti-reimport. Ver `auditoria_gl_api.py`.
+    # Mis libros guarda el Excel del owner TAL CUAL para bajarlo después: no
+    # entra ningún número a ningún escenario. Y el registro frenaría con 409 subir
+    # el mismo archivo otra vez, que acá es legítimo (volver a colgarlo).
+    "libros_colgados_api.py:subir_libro",
     "auditoria_gl_api.py:revisar",
     "auditoria_gl_api.py:excel",
     "auditoria_gl_api.py:_revisar",

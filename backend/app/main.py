@@ -78,6 +78,7 @@ from app.api.costos_grupos_resumen_api import router as costos_grupos_resumen_ro
 from app.api.costos_grupos_master_api import router as costos_grupos_master_router
 from app.api.cierre_periodos_api import router as cierre_router
 from app.api.guillermo_api import router as guillermo_router
+from app.api.libros_colgados_api import router as libros_router
 from app.hotel_actual import HOTEL_ID, HOTEL_NAME
 
 # ⚠️ **La documentación interactiva se apaga en el servidor.**
@@ -249,6 +250,7 @@ app.include_router(costos_grupos_resumen_router, prefix="/api", dependencies=_gu
 app.include_router(costos_grupos_master_router, prefix="/api", dependencies=_guard)
 app.include_router(cierre_router, prefix="/api", dependencies=_guard)
 app.include_router(guillermo_router, prefix="/api", dependencies=_guard)
+app.include_router(libros_router, prefix="/api", dependencies=_guard)
 app.include_router(auth_router, prefix="/api")   # público (login/bootstrap/status)
 
 

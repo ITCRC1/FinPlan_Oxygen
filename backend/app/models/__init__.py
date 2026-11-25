@@ -144,3 +144,4 @@ from app.models.guillermo import (
 # venden Full Board.
 from app.models.fb_plan import (
     FbPlanConfig, FbPlanMes, COMIDAS, DEFAULT_SERVICIO, calcular_mes)
+from app.models.libro_colgado import LibroColgado  # noqa: F401
